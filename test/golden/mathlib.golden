@@ -1,0 +1,77 @@
+# Mathlib notation. SYNTHETIC: written from Mathlib's notation declarations, not captured from a
+# real Mathlib session (no Mathlib available locally yet). Re-check against real output later.
+
+lean: ∀ ε > 0, ∃ δ > 0, ∀ (x : ℝ), |x - a| < δ → |f x - f a| < ε
+tex: \forall \varepsilon > 0,\ \exists \delta > 0,\ \forall x \in \mathbb{R},\ \left|x - a\right| < \delta \to \left|f\left(x\right) - f\left(a\right)\right| < \varepsilon
+
+lean: ∑ i ∈ Finset.range n, i = n * (n - 1) / 2
+tex: \sum_{i=0}^{n - 1} i = \frac{n \cdot \left(n - 1\right)}{2}
+
+lean: ∑ i ∈ Finset.range (n + 1), ↑i ^ 2
+tex: \sum_{i=0}^{n} i^{2}
+
+lean: ∏ i ∈ s, f i
+tex: \prod_{i \in s} f\left(i\right)
+
+lean: √2 * √2 = 2
+tex: \sqrt{2} \cdot \sqrt{2} = 2
+
+lean: Real.sqrt (x ^ 2) = |x|
+tex: \sqrt{x^{2}} = \left|x\right|
+
+lean: x⁻¹ * x = 1
+tex: x^{-1} \cdot x = 1
+
+lean: (n + 1)! = (n + 1) * n !
+tex: \left(n + 1\right)! = \left(n + 1\right) \cdot n!
+
+lean: ‖x + y‖ ≤ ‖x‖ + ‖y‖
+tex: \left\|x + y\right\| \leq \left\|x\right\| + \left\|y\right\|
+
+lean: ⌊x⌋ ≤ x
+tex: \left\lfloor x\right\rfloor \leq x
+
+lean: s ⊆ t ∪ u
+tex: s \subseteq t \cup u
+
+lean: s ∩ t = ∅
+tex: s \cap t = \emptyset
+
+lean: {x | x > 0} = Set.Ioi 0
+tex: \left\{ x \mid x > 0 \right\} = \operatorname{Set.Ioi}\left(0\right)
+
+lean: {x : ℝ | 0 < x}
+tex: \left\{ x \in \mathbb{R} \mid 0 < x \right\}
+
+lean: ∀ x ∈ Set.Icc 0 1, f x ≤ 1
+tex: \forall x \in \operatorname{Set.Icc}\left(0, 1\right),\ f\left(x\right) \leq 1
+
+lean: Real.exp (Real.log x) = x
+tex: \exp \left(\log x\right) = x
+
+lean: Real.sin x ^ 2 + Real.cos x ^ 2 = 1
+tex: \left(\sin x\right)^{2} + \left(\cos x\right)^{2} = 1
+
+lean: Nat.gcd a b ∣ a
+tex: \gcd\left({a}, {b}\right) \mid a
+
+lean: ℕ → ℝ
+tex: \mathbb{N} \to \mathbb{R}
+
+lean: (fun x ↦ x ^ 2) = fun x ↦ x * x
+tex: \left(x \mapsto x^{2}\right) = x \mapsto x \cdot x
+
+lean: a₁ + a₂ = n✝
+tex: a_{1} + a_{2} = {n^{\dagger}}
+
+lean: #s = 3
+tex: \left|{s}\right| = 3
+
+lean: (2 : ℝ) / 3 < 1
+tex: \frac{2}{3} < 1
+
+lean: Real.pi / 2 < 2
+tex: \frac{\pi}{2} < 2
+
+lean: ∫ x in 0..1, x ^ 2 = 1 / 3
+tex: \texttt{$∫$ x in 0..1, x \textasciicircum{} 2 = 1 / 3}

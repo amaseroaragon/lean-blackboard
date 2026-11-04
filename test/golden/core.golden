@@ -1,0 +1,101 @@
+# Real pretty-printer output from Lean v4.35.0 (`#check`), Lean core only (no Mathlib).
+# Format: `lean:` input line, `tex:` expected LaTeX. Blank lines separate cases.
+
+lean: ∀ (n : Nat), 0 + n = n
+tex: \forall n \in \mathbb{N},\ 0 + n = n
+
+lean: ∀ (x y : Nat), x + y = y + x
+tex: \forall x, y \in \mathbb{N},\ x + y = y + x
+
+lean: ∃ m, n < m
+tex: \exists m,\ n < m
+
+lean: ∃ m, m > 0 ∧ n < m
+tex: \exists m,\ m > 0 \land n < m
+
+lean: ∀ (x : Nat), x ∈ l → x ≤ 10
+tex: \forall x \in \mathbb{N},\ x \in l \to x \leq 10
+
+lean: p ∧ q → q ∧ p
+tex: p \land q \to q \land p
+
+lean: ¬(p ∨ q) ↔ ¬p ∧ ¬q
+tex: \neg \left(p \lor q\right) \iff \neg p \land \neg q
+
+lean: ¬n = m
+tex: \neg\left(n = m\right)
+
+lean: n ≠ m
+tex: n \neq m
+
+lean: (n + 1) * (m - 1) = n * m
+tex: \left(n + 1\right) \cdot \left(m - 1\right) = n \cdot m
+
+lean: (a + b) / c
+tex: \frac{a + b}{c}
+
+lean: a ^ 2 + b ^ 2 = c ^ (n + 1)
+tex: a^{2} + b^{2} = c^{n + 1}
+
+lean: -a * -b
+tex: -a \cdot \left(-b\right)
+
+lean: n % 2 = 1
+tex: n \bmod 2 = 1
+
+lean: f (n + 1) = f n + 1
+tex: f\left(n + 1\right) = f\left(n\right) + 1
+
+lean: f (f n)
+tex: f\left(f\left(n\right)\right)
+
+lean: x₁ + x' = 0
+tex: x_{1} + x' = 0
+
+lean: fun x => x + 1
+tex: x \mapsto x + 1
+
+lean: (fun x => x * 2) 3
+tex: \left(x \mapsto x \cdot 2\right)\left(3\right)
+
+lean: (n, m) = (m, n)
+tex: \left(n, m\right) = \left(m, n\right)
+
+lean: l ++ [1, 2] = 0 :: l
+tex: l \mathbin{+\!\!+} \left[1, 2\right] = 0 :: l
+
+lean: n ∣ m * k
+tex: n \mid m \cdot k
+
+lean: l.length = 3
+tex: l.\mathrm{length} = 3
+
+lean: (l ++ s).length
+tex: \left(l \mathbin{+\!\!+} s\right).\mathrm{length}
+
+lean: n > 0 → m = m
+tex: n > 0 \to m = m
+
+lean: n.succ = n + 1
+tex: n.\mathrm{succ} = n + 1
+
+lean: 2 * a
+tex: 2 \cdot a
+
+lean: ↑n + a
+tex: n + a
+
+lean: ∀ {β : Type} [Inhabited β], Nonempty β
+tex: \forall \beta : \mathrm{Type},\ \operatorname{Nonempty}\left(\beta\right)
+
+lean: α × Nat → Prop
+tex: \alpha \times \mathbb{N} \to \mathrm{Prop}
+
+lean: (fun x => x) ∘ f
+tex: \left(x \mapsto x\right) \circ f
+
+lean: if n = 0 then 1 else 2
+tex: \texttt{if n = 0 then 1 else 2}
+
+lean: Prop
+tex: \mathrm{Prop}

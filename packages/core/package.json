@@ -1,0 +1,14 @@
+{
+  "name": "@lean-blackboard/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Lean goals to LaTeX conversion. Pure TypeScript, no vscode dependency.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "katex": "~0.19.1"
+  }
+}

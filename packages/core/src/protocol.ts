@@ -3,9 +3,15 @@
 
 export interface HypView {
   names: string[];
+  /** Names as LaTeX (`h_{1}, h_{2}`). */
+  namesLatex: string;
+  /** Type in Lean syntax. */
   type: string;
+  /** Type as LaTeX (may contain `\texttt{}` fallbacks, never empty). */
+  typeLatex: string;
   /** Value of a `let`-bound hypothesis (`x : T := v`). */
   val?: string;
+  valLatex?: string;
   isInserted: boolean;
   isRemoved: boolean;
 }
@@ -19,10 +25,11 @@ export type GoalView =
       prefix: string;
       hyps: HypView[];
       type: string;
+      typeLatex: string;
       isInserted: boolean;
       isRemoved: boolean;
     }
-  /** Fallback from `$/lean/plainGoal`: one pre-rendered goal. */
+  /** Fallback from `$/lean/plainGoal`: one pre-rendered goal, shown as Lean text. */
   | { kind: 'plain'; text: string };
 
 export type PanelState =

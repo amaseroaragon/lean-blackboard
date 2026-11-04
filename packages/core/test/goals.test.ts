@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flattenTaggedText, interactiveGoalsToView, plainGoalToView } from '../src/goals';
+import { flattenTaggedText, interactiveGoalsToView, plainGoalToView } from '../src';
 
 // Real response captured from Lean v4.34.1 (`imp_trans`, cursor on `exact hpq hp`),
 // with RPC refs in wire format v1 as the official client negotiates.
@@ -69,10 +69,25 @@ describe('interactiveGoalsToView', () => {
         userName: undefined,
         prefix: '⊢ ',
         hyps: [
-          { names: ['p', 'q', 'r'], type: 'Prop', isInserted: false, isRemoved: false },
-          { names: ['hpq'], type: 'p → q', isInserted: false, isRemoved: false },
+          {
+            names: ['p', 'q', 'r'],
+            namesLatex: 'p, q, r',
+            type: 'Prop',
+            typeLatex: '\\mathrm{Prop}',
+            isInserted: false,
+            isRemoved: false,
+          },
+          {
+            names: ['hpq'],
+            namesLatex: '\\mathrm{hpq}',
+            type: 'p → q',
+            typeLatex: 'p \\to q',
+            isInserted: false,
+            isRemoved: false,
+          },
         ],
         type: 'q',
+        typeLatex: 'q',
         isInserted: false,
         isRemoved: true,
       },
@@ -93,8 +108,11 @@ describe('interactiveGoalsToView', () => {
     expect(g).toMatchObject({ kind: 'structured', userName: 'succ', prefix: '⊢ ', type: 'x = 3' });
     expect(g?.kind === 'structured' && g.hyps[0]).toEqual({
       names: ['x'],
+      namesLatex: 'x',
       type: 'Nat',
+      typeLatex: '\\mathbb{N}',
       val: '3',
+      valLatex: '3',
       isInserted: true,
       isRemoved: false,
     });

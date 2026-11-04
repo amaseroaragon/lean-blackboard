@@ -1,0 +1,21 @@
+{
+  "name": "lean-blackboard-monorepo",
+  "private": true,
+  "workspaces": [
+    "packages/core",
+    "packages/webview",
+    "packages/extension"
+  ],
+  "scripts": {
+    "build": "npm run build -w @lean-blackboard/webview && npm run build -w lean-blackboard",
+    "watch": "npm run watch -w @lean-blackboard/webview & npm run watch -w lean-blackboard",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "~22.20.5",
+    "esbuild": "~0.28.2",
+    "typescript": "~5.9.3",
+    "vitest": "~5.1.0"
+  }
+}
