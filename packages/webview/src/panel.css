@@ -223,6 +223,17 @@ details.before > summary {
   font-size: 0.9em;
 }
 
+/* Off-screen line measurement for breaking long formulas. */
+.measurer {
+  position: absolute;
+  top: 0;
+  left: -100000px;
+  visibility: hidden;
+  width: auto;
+  overflow: visible;
+  white-space: nowrap;
+}
+
 /* Interactivity (precise mode). */
 .lb-hover {
   border-radius: 2px;

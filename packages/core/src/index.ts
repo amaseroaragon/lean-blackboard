@@ -25,7 +25,7 @@ export {
 } from './precise';
 export type { PreciseView, WireRules } from './precise';
 export { goalToLatexArray, goalsToLatexDocument } from './export';
-export { breakLatex, splitTopLevel } from './render/break';
+export { breakLatex, breakToFit, splitTopLevel } from './render/break';
 export { stripMarkers } from './render/markers';
 export { applyPreciseExprs, interactiveDiagnosticsToView } from './messages';
 export type { MessagesResult } from './messages';

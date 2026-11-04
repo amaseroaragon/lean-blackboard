@@ -13,7 +13,7 @@ import type {
   ViewConfig,
   WebviewMessage,
 } from '@lean-blackboard/core';
-import { breakLatex, goalsToLatexDocument, stripMarkers } from '@lean-blackboard/core';
+import { breakToFit, goalsToLatexDocument, stripMarkers } from '@lean-blackboard/core';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import './panel.css';
@@ -151,8 +151,6 @@ function renderRow(row: Row): HTMLElement {
   return el('div', `row ${row.className}`, content, actions);
 }
 
-/** Deepest line-breaking level tried for formulas wider than the panel. */
-const MAX_BREAK_DEPTH = 3;
 
 function render(): void {
   let nodes: Node[];
@@ -177,17 +175,67 @@ function fitFormulas(): void {
 }
 
 /** Re-renders one formula (already in the DOM, with `data-latex`) broken into lines if too wide. */
+/**
+ * Room kept free when breaking: the `aligned` environment adds column spacing that measuring
+ * single lines does not include.
+ */
+const FIT_MARGIN_PX = 20;
+
 function fitNode(node: HTMLElement): void {
+  const available = node.clientWidth;
+  if (node.scrollWidth <= available + 1) return;
   const latex = node.dataset.latex ?? '';
   const lean = node.dataset.lean ?? '';
-  let previous = latex;
-  for (let depth = 1; depth <= MAX_BREAK_DEPTH && node.scrollWidth > node.clientWidth + 1; depth++) {
-    const broken = breakLatex(latex, depth);
-    if (broken === previous) break;
+  // Measure candidate lines with the same classes (hence fonts) as the formula itself.
+  measurer.className = `${node.className} measurer`;
+  // Lines are measured one by one; inside `aligned` they come out slightly wider. Correct with
+  // the real result: if it still overflows, try again with the target reduced by the excess.
+  let width = available - FIT_MARGIN_PX;
+  for (let attempt = 0; attempt < 3 && width > 40; attempt++) {
+    const target = width;
+    const cache = new Map<string, boolean>();
+    const fits = (line: string): boolean => {
+      let ok = cache.get(line);
+      if (ok === undefined) {
+        ok = measureWidth(line) <= target;
+        cache.set(line, ok);
+      }
+      return ok;
+    };
+    const broken = breakToFit(latex, fits);
+    if (broken === latex) return;
     renderKatex(node, broken, lean);
-    previous = broken;
+    const excess = node.scrollWidth - available;
+    if (excess <= 1) return;
+    width -= excess + 4;
   }
 }
+
+/** Off-screen element where candidate lines are rendered to measure their width. */
+const measurer = el('div', 'measurer');
+document.body.append(measurer);
+
+function measureWidth(latex: string): number {
+  try {
+    katex.render(`\\displaystyle ${latex}`, measurer, {
+      throwOnError: true,
+      displayMode: false,
+      strict: 'ignore',
+      trust: (ctx) => ctx.command === '\\htmlData',
+      maxExpand: 1000,
+      maxSize: 20,
+      macros: { ...config.macros },
+    });
+  } catch {
+    return Number.POSITIVE_INFINITY;
+  }
+  return measurer.scrollWidth;
+}
+
+// KaTeX's fonts load asynchronously: widths measured before they arrive are wrong, so draw
+// (and fit) again once they are available.
+document.fonts?.addEventListener('loadingdone', () => render());
+void document.fonts?.ready.then(() => render());
 
 // Re-fit when the panel width changes (not its height, which our own rendering changes).
 let lastWidth = root.clientWidth;
