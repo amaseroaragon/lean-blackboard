@@ -6,11 +6,12 @@ import {
   PRECISE_METHOD,
   PreciseProtocolError,
   interactiveGoalsToView,
+  interactiveTermGoalToView,
   plainGoalToView,
   preciseGoalsToView,
   rulesToWire,
 } from '@lean-blackboard/core';
-import type { GoalView } from '@lean-blackboard/core';
+import type { PreciseView } from '@lean-blackboard/core';
 import { CancelledError, ERR_METHOD_NOT_FOUND, LeanBridge, Position, describeError, errorCode, ms } from './leanBridge';
 import type { GoalsPanel } from './panel';
 import type { Settings } from './settings';
@@ -109,16 +110,25 @@ export class GoalTracker implements vscode.Disposable {
       if (token.isCancellationRequested) return;
       if (precise !== undefined) {
         this.log.debug(`getGoalsLatex ${location} (${ms(t0)})`);
-        this.panel.setState({ kind: 'goals', location, goals: precise, mode: 'precise' });
+        this.panel.setState({ kind: 'goals', location, ...precise, mode: 'precise' });
         return;
       }
-      const res = await this.bridge.interactiveGoals(doc.uri, position, token);
+      const [res, termRes] = await Promise.all([
+        this.bridge.interactiveGoals(doc.uri, position, token),
+        // The expected type is a bonus: never fail the whole update because of it.
+        this.bridge.interactiveTermGoal(doc.uri, position, token).catch((e: unknown) => {
+          if (e instanceof CancelledError) throw e;
+          this.log.debug(`getInteractiveTermGoal failed: ${describeError(e)}`);
+          return null;
+        }),
+      ]);
       if (token.isCancellationRequested) return;
       this.log.debug(`getInteractiveGoals ${location} (${ms(t0)})`);
       this.panel.setState({
         kind: 'goals',
         location,
         goals: interactiveGoalsToView(res, this.settings.rules),
+        termGoal: interactiveTermGoalToView(termRes, this.settings.rules),
         mode: 'fast',
       });
       return;
@@ -156,7 +166,7 @@ export class GoalTracker implements vscode.Disposable {
     uri: vscode.Uri,
     position: Position,
     token: vscode.CancellationToken,
-  ): Promise<GoalView[] | null | undefined> {
+  ): Promise<PreciseView | undefined> {
     if (this.settings.mode === 'fast') return undefined;
     const key = uri.toString();
     const checked = this.noPrecise.get(key);

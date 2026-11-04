@@ -150,13 +150,17 @@ function renderState(state: PanelState): Node[] {
         nodes.push(message(`Showing plain goals (interactive goals failed: ${state.fallbackReason})`, 'message warning'));
       }
       if (state.goals === null) {
-        nodes.push(message('No tactic state at the cursor.'));
+        if (!state.termGoal) nodes.push(message('No tactic state at the cursor.'));
       } else if (state.goals.length === 0) {
         nodes.push(message('No goals.', 'message success'));
       } else {
         const n = state.goals.length;
         nodes.push(el('h2', 'count', n === 1 ? '1 goal' : `${n} goals`));
-        nodes.push(...state.goals.map(renderGoal));
+        nodes.push(...state.goals.map((g, i) => renderGoal(g, `g${i}`)));
+      }
+      if (state.termGoal) {
+        nodes.push(el('h2', 'count', 'Expected type'));
+        nodes.push(renderGoal(state.termGoal, 'term'));
       }
       return nodes;
     }
@@ -167,16 +171,16 @@ function location(text: string): HTMLElement {
   return el('div', 'location', text);
 }
 
-function renderGoal(goal: GoalView, index: number): HTMLElement {
+function renderGoal(goal: GoalView, keyPrefix: string): HTMLElement {
   if (goal.kind === 'plain') return el('section', 'goal', el('pre', 'code', goal.text));
 
   const section = el('section', diffClass('goal', goal.isInserted, goal.isRemoved));
   if (goal.userName) section.append(el('div', 'case', `case ${goal.userName}`));
-  section.append(...goal.hyps.map((h) => renderRow(hypRow(h, index))));
+  section.append(...goal.hyps.map((h) => renderRow(hypRow(h, keyPrefix))));
   const prefix = goal.prefix.trim() === '⊢' ? '\\vdash' : `\\texttt{${goal.prefix.trim()}}`;
   section.append(
     renderRow({
-      key: `g${index}:goal`,
+      key: `${keyPrefix}:goal`,
       latex: `${prefix} ${goal.typeLatex}`,
       lean: `${goal.prefix}${goal.type}`,
       className: 'target',
@@ -185,7 +189,7 @@ function renderGoal(goal: GoalView, index: number): HTMLElement {
   return section;
 }
 
-function hypRow(h: HypView, goalIndex: number): Row {
+function hypRow(h: HypView, keyPrefix: string): Row {
   let latex = `${h.namesLatex} : ${h.typeLatex}`;
   let lean = `${h.names.join(' ')} : ${h.type}`;
   if (h.val !== undefined && h.valLatex !== undefined) {
@@ -193,7 +197,7 @@ function hypRow(h: HypView, goalIndex: number): Row {
     lean += ` := ${h.val}`;
   }
   return {
-    key: `g${goalIndex}:hyp:${h.names.join(' ')}`,
+    key: `${keyPrefix}:hyp:${h.names.join(' ')}`,
     latex,
     lean,
     className: diffClass('hyp', h.isInserted, h.isRemoved),

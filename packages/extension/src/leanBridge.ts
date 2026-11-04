@@ -230,6 +230,12 @@ export class LeanBridge implements vscode.Disposable {
     return this.rpcCall(uri, position, method, params, token, { releaseRefs: false });
   }
 
+  /** `Lean.Widget.getInteractiveTermGoal`: expected type at the position (term mode) or `null`. */
+  async interactiveTermGoal(uri: vscode.Uri, position: Position, token: vscode.CancellationToken): Promise<unknown> {
+    const params = { textDocument: { uri: uri.toString() }, position };
+    return this.rpcCall(uri, position, 'Lean.Widget.getInteractiveTermGoal', params, token, { releaseRefs: true });
+  }
+
   private async rpcCall(
     uri: vscode.Uri,
     position: Position,

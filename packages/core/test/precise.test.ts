@@ -12,7 +12,7 @@ describe('rulesToWire', () => {
 describe('preciseGoalsToView', () => {
   it('maps the wire format to the view model', () => {
     const res = {
-      version: 1,
+      version: 2,
       goals: [
         {
           userName: 'succ',
@@ -23,7 +23,7 @@ describe('preciseGoalsToView', () => {
         },
       ],
     };
-    expect(preciseGoalsToView(res, defaultRules)).toEqual([
+    expect(preciseGoalsToView(res, defaultRules).goals).toEqual([
       {
         kind: 'structured',
         userName: 'succ',
@@ -47,10 +47,19 @@ describe('preciseGoalsToView', () => {
   });
 
   it('rejects other protocol versions', () => {
-    expect(() => preciseGoalsToView({ version: 2, goals: [] }, defaultRules)).toThrow(PreciseProtocolError);
+    expect(() => preciseGoalsToView({ version: 1, goals: [] }, defaultRules)).toThrow(PreciseProtocolError);
   });
 
   it('passes null through', () => {
-    expect(preciseGoalsToView(null, defaultRules)).toBeNull();
+    expect(preciseGoalsToView(null, defaultRules)).toEqual({ goals: null });
+  });
+
+  it('keeps the expected type; only-expected-type means no tactic state', () => {
+    const termGoal = { goalPrefix: '⊢ ', hyps: [], type: 'Nat', typeLatex: '\\mathbb{N}' };
+    const v = preciseGoalsToView({ version: 2, goals: [], termGoal }, defaultRules);
+    expect(v.goals).toBeNull();
+    expect(v.termGoal).toMatchObject({ kind: 'structured', typeLatex: '\\mathbb{N}' });
+    const both = preciseGoalsToView({ version: 2, goals: [termGoal], termGoal }, defaultRules);
+    expect(both.goals).toHaveLength(1);
   });
 });

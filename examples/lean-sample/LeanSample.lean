@@ -28,3 +28,7 @@ theorem bounded (l : List Nat) (h : ∀ x ∈ l, x ≤ 10) : ∀ x ∈ l, x < 11
   intro x hx
   have := h x hx
   omega
+
+-- Term mode: put the cursor on `h` or `Nat.lt_of_lt_of_le` to see the expected type.
+theorem term_mode (n : Nat) (h : n < 5) : n < 10 :=
+  Nat.lt_of_lt_of_le h (by decide)

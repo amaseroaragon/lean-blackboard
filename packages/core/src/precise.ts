@@ -6,7 +6,7 @@ import { identToLatex } from './render/ident';
 import type { Rules } from './rules/types';
 
 export const PRECISE_METHOD = 'LeanBlackboard.getGoalsLatex';
-export const PRECISE_PROTOCOL_VERSION = 1;
+export const PRECISE_PROTOCOL_VERSION = 2;
 
 /** `Rules` in the shape the Lean side expects (only `symbols` and `functions` apply there). */
 export interface WireRules {
@@ -43,9 +43,14 @@ interface WireGoal {
 
 export class PreciseProtocolError extends Error {}
 
+export interface PreciseView {
+  goals: GoalView[] | null;
+  termGoal?: GoalView;
+}
+
 /** Converts a `getGoalsLatex` response. Throws `PreciseProtocolError` on a version/shape mismatch. */
-export function preciseGoalsToView(res: unknown, rules: Rules): GoalView[] | null {
-  if (res === null || res === undefined) return null;
+export function preciseGoalsToView(res: unknown, rules: Rules): PreciseView {
+  if (res === null || res === undefined) return { goals: null };
   if (typeof res !== 'object' || !('goals' in res) || !Array.isArray(res.goals)) {
     throw new PreciseProtocolError('Unexpected getGoalsLatex response shape.');
   }
@@ -55,7 +60,14 @@ export function preciseGoalsToView(res: unknown, rules: Rules): GoalView[] | nul
       `Companion package protocol version ${String(version)}, expected ${PRECISE_PROTOCOL_VERSION}.`,
     );
   }
-  return (res.goals as WireGoal[]).map((g) => ({
+  const termGoal = 'termGoal' in res && res.termGoal ? goalToView(res.termGoal as WireGoal, rules) : undefined;
+  const goals = (res.goals as WireGoal[]).map((g) => goalToView(g, rules));
+  // Lean answers `goals: []` when it only has an expected type: that is "no tactic state".
+  return { goals: goals.length === 0 && termGoal ? null : goals, termGoal };
+}
+
+function goalToView(g: WireGoal, rules: Rules): GoalView {
+  return {
     kind: 'structured',
     userName: g.userName,
     prefix: g.goalPrefix,
@@ -64,7 +76,7 @@ export function preciseGoalsToView(res: unknown, rules: Rules): GoalView[] | nul
     typeLatex: g.typeLatex,
     isInserted: g.isInserted === true,
     isRemoved: g.isRemoved === true,
-  }));
+  };
 }
 
 function hypToView(h: WireHyp, rules: Rules): HypView {

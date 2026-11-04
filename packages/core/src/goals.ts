@@ -60,6 +60,27 @@ function hypToView(h: InteractiveHypothesisBundle, rules: Rules): HypView {
   return view;
 }
 
+/**
+ * Converts a `getInteractiveTermGoal` response (`InteractiveTermGoal | null`): the expected type
+ * of the term at the cursor, with its local context.
+ */
+export function interactiveTermGoalToView(res: unknown, rules: Rules = defaultRules): GoalView | undefined {
+  if (res === null || res === undefined) return undefined;
+  if (typeof res !== 'object' || !('type' in res) || !('hyps' in res) || !Array.isArray(res.hyps)) {
+    throw new Error('Unexpected getInteractiveTermGoal response shape.');
+  }
+  const g = res as { hyps: InteractiveHypothesisBundle[]; type: CodeWithInfos };
+  return {
+    kind: 'structured',
+    prefix: '⊢ ',
+    hyps: g.hyps.map((h) => hypToView(h, rules)),
+    type: flattenTaggedText(g.type),
+    typeLatex: taggedTextToLatex(g.type, rules),
+    isInserted: false,
+    isRemoved: false,
+  };
+}
+
 /** Converts a `$/lean/plainGoal` response (`{ rendered, goals } | null`). */
 export function plainGoalToView(res: unknown): GoalView[] | null {
   if (res === null || res === undefined) return null;

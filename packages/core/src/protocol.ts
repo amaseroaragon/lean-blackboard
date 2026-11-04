@@ -42,6 +42,8 @@ export type PanelState =
       location: string;
       /** `null`: no tactic state at the cursor. `[]`: no goals left. */
       goals: GoalView[] | null;
+      /** Expected type of the term at the cursor (term mode), if any. */
+      termGoal?: GoalView;
       /** Set when the RPC path failed and `plainGoal` was used instead. */
       fallbackReason?: string;
       /** `precise`: LaTeX from the companion Lean package; `fast`: converted from text here. */

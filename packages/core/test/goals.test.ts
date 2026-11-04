@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flattenTaggedText, interactiveGoalsToView, plainGoalToView } from '../src';
+import { flattenTaggedText, interactiveGoalsToView, interactiveTermGoalToView, plainGoalToView } from '../src';
 
 // Real response captured from Lean v4.34.1 (`imp_trans`, cursor on `exact hpq hp`),
 // with RPC refs in wire format v1 as the official client negotiates.
@@ -139,5 +139,28 @@ describe('plainGoalToView', () => {
 
   it('returns null for null', () => {
     expect(plainGoalToView(null)).toBeNull();
+  });
+});
+
+describe('interactiveTermGoalToView', () => {
+  it('converts the expected type and its context', () => {
+    const res = {
+      hyps: [{ names: ['n'], fvarIds: ['_uniq.1'], type: { text: 'Nat' } }],
+      type: { tag: [{ info: { __rpcref: '1' } }, { append: [{ text: 'n' }, { text: ' < ' }, { text: '5' }] }] },
+      ctx: { __rpcref: '2' },
+      range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } },
+      term: { __rpcref: '3' },
+    };
+    expect(interactiveTermGoalToView(res)).toMatchObject({
+      kind: 'structured',
+      prefix: '⊢ ',
+      type: 'n < 5',
+      typeLatex: 'n < 5',
+      hyps: [{ names: ['n'], typeLatex: '\\mathbb{N}' }],
+    });
+  });
+
+  it('returns undefined for null', () => {
+    expect(interactiveTermGoalToView(null)).toBeUndefined();
   });
 });

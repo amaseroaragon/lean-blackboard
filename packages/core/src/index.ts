@@ -1,5 +1,5 @@
 export { leanToLatex, taggedTextToLatex } from './convert';
-export { interactiveGoalsToView, plainGoalToView } from './goals';
+export { interactiveGoalsToView, interactiveTermGoalToView, plainGoalToView } from './goals';
 export type { InteractiveGoal, InteractiveHypothesisBundle } from './goals';
 export { parseTerm } from './parser/parser';
 export type { BinderGroup, Term } from './parser/ast';
@@ -22,4 +22,4 @@ export {
   preciseGoalsToView,
   rulesToWire,
 } from './precise';
-export type { WireRules } from './precise';
+export type { PreciseView, WireRules } from './precise';
