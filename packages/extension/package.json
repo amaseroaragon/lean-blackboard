@@ -1,0 +1,42 @@
+{
+  "name": "lean-blackboard",
+  "displayName": "Lean Blackboard",
+  "description": "Shows Lean 4 hypotheses and goals with rendered math notation.",
+  "version": "0.0.1",
+  "private": true,
+  "publisher": "amaseroaragon",
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionDependencies": [
+    "leanprover.lean4"
+  ],
+  "activationEvents": [
+    "onLanguage:lean4"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "leanBlackboard.dumpGoals",
+        "title": "Dump Goals",
+        "category": "Lean Blackboard"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "~22.20.5",
+    "@types/vscode": "~1.90.0",
+    "esbuild": "~0.28.2",
+    "typescript": "~5.9.3"
+  }
+}

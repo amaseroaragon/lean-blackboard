@@ -1,0 +1,5 @@
+name = "lean-sample"
+defaultTargets = ["LeanSample"]
+
+[[lean_lib]]
+name = "LeanSample"
