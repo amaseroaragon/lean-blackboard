@@ -1,11 +1,17 @@
 import { goalsToLatexDocument } from '@lean-blackboard/core';
+import type { PanelState } from '@lean-blackboard/core';
 import * as vscode from 'vscode';
 import { GoalTracker } from './goalTracker';
 import { LeanBridge } from './leanBridge';
 import { GoalsPanel } from './panel';
 import { Settings } from './settings';
 
-export function activate(context: vscode.ExtensionContext): void {
+/** Returned from `activate`; used by the integration tests to observe the panel. */
+export interface LeanBlackboardApi {
+  panelState(): PanelState;
+}
+
+export function activate(context: vscode.ExtensionContext): LeanBlackboardApi {
   const log = vscode.window.createOutputChannel('Lean Blackboard', { log: true });
   const bridge = new LeanBridge(log);
   const settings = new Settings(context.globalState, log);
@@ -38,6 +44,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Connect in the background: never block activation on the Lean extension.
   bridge.start();
+  return { panelState: () => panel.currentState };
 }
 
 export function deactivate(): void {}

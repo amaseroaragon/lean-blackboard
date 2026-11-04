@@ -2,3 +2,5 @@ node_modules/
 dist/
 .lake/
 *.vsix
+.vscode-test/
+dist-test/

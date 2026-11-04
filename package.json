@@ -13,7 +13,8 @@
     "test": "vitest run",
     "package": "npm run build && npm run package -w lean-blackboard",
     "export-rules": "esbuild scripts/export-rules.ts --bundle --platform=node --log-level=warning --outfile=node_modules/.cache/export-rules.js && node node_modules/.cache/export-rules.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test:integration": "npm run build && npm run test:integration -w lean-blackboard"
   },
   "devDependencies": {
     "@eslint/js": "~10.0.1",
