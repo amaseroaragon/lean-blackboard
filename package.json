@@ -12,12 +12,16 @@
     "typecheck": "npm run typecheck --workspaces",
     "test": "vitest run",
     "package": "npm run build && npm run package -w lean-blackboard",
-    "export-rules": "esbuild scripts/export-rules.ts --bundle --platform=node --log-level=warning --outfile=node_modules/.cache/export-rules.js && node node_modules/.cache/export-rules.js"
+    "export-rules": "esbuild scripts/export-rules.ts --bundle --platform=node --log-level=warning --outfile=node_modules/.cache/export-rules.js && node node_modules/.cache/export-rules.js",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "~10.0.1",
     "@types/node": "~22.20.5",
     "esbuild": "~0.28.2",
+    "eslint": "~10.14.0",
     "typescript": "~5.9.3",
+    "typescript-eslint": "~8.72.1",
     "vitest": "~5.1.0"
   }
 }

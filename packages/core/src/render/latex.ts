@@ -19,7 +19,7 @@ export function texttt(text: string): string {
     }
   });
   // KaTeX rejects many Unicode math symbols in text mode (`∫`, `∑`…): switch to math for them.
-  const safe = escaped.replace(/[^\p{L}\p{N}\x00-\x7F]/gu, (c) => `$${c}$`);
+  const safe = escaped.replace(/[^\p{L}\p{N}\p{ASCII}]/gu, (c) => `$${c}$`);
   return `\\texttt{${safe}}`;
 }
 
