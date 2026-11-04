@@ -10,7 +10,8 @@
     "build": "npm run build -w @lean-blackboard/webview && npm run build -w lean-blackboard",
     "watch": "npm run watch -w @lean-blackboard/webview & npm run watch -w lean-blackboard",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "vitest run"
+    "test": "vitest run",
+    "package": "npm run build && npm run package -w lean-blackboard"
   },
   "devDependencies": {
     "@types/node": "~22.20.5",

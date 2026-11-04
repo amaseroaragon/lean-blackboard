@@ -1,0 +1,9 @@
+# Only the bundles, the icon and the manifest go into the .vsix (no source maps).
+**
+!dist/extension.js
+!dist/webview/webview.js
+!dist/webview/webview.css
+!dist/webview/fonts/**
+!media/**
+!package.json
+!README.md
