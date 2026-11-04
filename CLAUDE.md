@@ -147,12 +147,12 @@ Criterios de aceptación (los comprueba el usuario a mano con F5 en el Extension
 Entregable adicional: una nota en `docs/spike-findings.md` con lo observado (formas reales de las
 respuestas, latencias, sorpresas) y las correcciones que haya que hacer a este documento.
 
-### Fase 1: Panel con texto plano ← ESTADO ACTUAL
+### Fase 1: Panel con texto plano (cerrada 2026-11-04)
 `WebviewView` en la barra lateral que sigue al cursor y muestra hipótesis y objetivos como texto
 Lean (aplanando el `TaggedText`). Sin LaTeX todavía. Se aplican el estado "esperando a Lean" y la
 seguridad del webview (CSP estricta).
 
-### Fase 2: Conversión y KaTeX
+### Fase 2: Conversión y KaTeX ← ESTADO ACTUAL
 - `packages/core`: `TaggedText` → AST → LaTeX, con unas 30 reglas iniciales (`∀ ∃ → ↔ ∧ ∨ ¬ ∈ ⊆
   ∑ ∏`, fracciones, `√`, `|x|`, potencias, subíndices, `ℕ ℤ ℚ ℝ ℂ`).
 - Tests golden en `test/golden`.
@@ -168,15 +168,20 @@ extensión detecta si existe y cambia de modo sola. Evaluar reutilizar LeanTeX (
 
 ## Comandos
 
-Desde `packages/extension/` (de momento no hay workspaces):
+Desde la raíz (npm workspaces: `packages/core`, `packages/webview`, `packages/extension`):
 
-- `npm install`: dependencias de desarrollo.
-- `npm run build`: bundles con esbuild: `dist/extension.js` (host) y `dist/webview.js` (UI).
-- `npm run watch`: bundles en modo watch.
-- `npm run typecheck`: `tsc --noEmit` en modo strict, para el host y para el webview (tiene su
-  propio `src/webview/tsconfig.json` con `DOM`).
-- `npm test`: tests de lógica pura con vitest (`test/`).
+- `npm install`: dependencias de todos los paquetes.
+- `npm run build`: bundles con esbuild. `packages/webview` escribe en
+  `packages/extension/dist/webview/` (script, CSS con KaTeX y fuentes) y `packages/extension` en
+  `packages/extension/dist/extension.js`.
+- `npm run watch`: ambos bundles en modo watch.
+- `npm run typecheck`: `tsc --noEmit` (strict) en cada paquete.
+- `npm test`: vitest. Incluye los golden de `test/golden/*.golden` (formato `lean:` / `tex:`), que
+  además comprueban que KaTeX acepta cada salida.
 - Lint: todavía no hay.
+
+`packages/core` no se compila por separado: se consume como TypeScript fuente (`main` apunta a
+`src/index.ts`) y esbuild lo empaqueta.
 
 Probar a mano: F5 en VS Code con la configuración "Run Extension (lean-sample)" (abre
 `examples/lean-sample`) o "Run Extension (empty window)" (sin ficheros Lean).
