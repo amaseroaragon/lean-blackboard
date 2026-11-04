@@ -1,0 +1,24 @@
+name = "lean-mathlib"
+defaultTargets = ["MathlibSample"]
+
+# Mathlib pinned to the tag matching `lean-toolchain`.
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.34.1"
+
+# Companion package (precise mode).
+[[require]]
+name = "LeanBlackboard"
+path = "../../lean"
+
+[[lean_lib]]
+name = "MathlibSample"
+
+# Golden tests of the precise mode on Mathlib: `lake build MathlibGolden`.
+[[lean_lib]]
+name = "MathlibGolden"
+
+# `#check` output used as input for the fast-mode goldens (test/golden/mathlib.golden).
+[[lean_lib]]
+name = "PP"
