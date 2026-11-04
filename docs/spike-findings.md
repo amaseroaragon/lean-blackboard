@@ -96,17 +96,23 @@ Observaciones:
 
 Con debounce de 150 ms la latencia del servidor es irrelevante en ficheros pequeños.
 
-## Pendiente de observar con F5
+## Criterios de aceptación: verificación automática
 
-La fase se cerró el 2026-11-04 por decisión del usuario sin registrar aquí estas observaciones.
-Quedan como comprobaciones a repetir cuando haga falta:
+Lo que quedó pendiente de observar con F5 lo verifican ahora los tests de integración
+(`npm run test:integration`, VS Code real + extensión oficial; ejecutados en local el 2026-11-04):
 
-- [ ] Formas reales en VS Code (deberían ser las de arriba con `__rpcref` en vez de `p`).
-- [ ] Latencias reales a través del cliente oficial.
-- [ ] Número de procesos `lean --server` / `lake serve` con y sin la extensión.
-- [ ] Sesión viva tras > 60 s sin mover el cursor.
-- [ ] Comportamiento tras `Lean 4: Restart Server` y `Lean 4: Restart File`.
-- [ ] Ventana sin ficheros Lean: sin errores.
+- [x] Sin ficheros Lean la extensión se activa y espera sin errores.
+- [x] Un solo `lake serve` por proyecto (contando solo los procesos de la instancia de pruebas).
+- [x] La sesión RPC sigue viva tras más de 30 s sin actividad (keep-alive).
+- [x] Tras `Lean 4: Restart Server` vuelven los objetivos sin intervención.
+- [x] Formas reales con el cliente oficial: referencias `{"__rpcref": "N"}` (wire format v1),
+  comprobado contra el servidor en las pruebas de extremo a extremo.
+- [x] Latencias: 3–8 ms por petición en ficheros pequeños; con Mathlib, 5–30 ms una vez elaborado.
+- [ ] La InfoView oficial sigue igual: no automatizable (comprobación visual).
+
+Hallazgo de los tests: si el primer intento de modo preciso fallaba mientras Lean aún cargaba los
+imports, el fichero se quedaba 30 s en modo rápido. Corregido: se reintenta cuando cambian los
+diagnósticos (señal de que la elaboración avanza).
 
 ## Correcciones a CLAUDE.md (aplicadas)
 

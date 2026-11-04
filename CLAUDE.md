@@ -162,7 +162,7 @@ seguridad del webview (CSP estricta).
 Toggle global y por hipótesis entre matemáticas y Lean, botón "copiar LaTeX", reglas de usuario en
 la configuración (`leanBlackboard.customRules`) y macros `\newcommand`.
 
-### Fase 4: Modo preciso (paquete Lean compañero) ← ESTADO ACTUAL
+### Fase 4: Modo preciso (paquete Lean compañero) (cerrada 2026-11-04)
 Paquete Lake en `lean/` con un `@[server_rpc_method]` que devuelve LaTeX a partir del `Expr`. La
 extensión detecta si existe y cambia de modo sola. Evaluar reutilizar LeanTeX (Apache 2.0).
 Debe resolver lo que el modo rápido no puede saber sin tipos:
@@ -174,6 +174,12 @@ Decisiones (2026-11-04): printer propio solo con Lean core (LeanTeX descartado: 
 v4.18.0-rc1, sin mantenimiento y con ProofWidgets); las reglas `functions`/`symbols` del cliente se
 envían en cada petición y se aplican también aquí. Detalles de uso en `docs/modo-preciso.md`.
 
+### Mejoras posteriores (2026-11-04)
+`.vsix` local, objetivos en modo término, Mathlib (proyecto de ejemplo, reglas y golden reales),
+tests de integración + CI + ESLint, partición de fórmulas largas, exportar el estado completo como
+LaTeX e interactividad en modo preciso (tipo al pasar el ratón, Ctrl/Cmd+clic a la definición).
+Ver `docs/`.
+
 ## Comandos
 
 Desde la raíz (npm workspaces: `packages/core`, `packages/webview`, `packages/extension`):
@@ -184,21 +190,33 @@ Desde la raíz (npm workspaces: `packages/core`, `packages/webview`, `packages/e
   `packages/extension/dist/extension.js`.
 - `npm run watch`: ambos bundles en modo watch.
 - `npm run typecheck`: `tsc --noEmit` (strict) en cada paquete.
+- `npm run lint`: ESLint (typescript-eslint).
 - `npm test`: vitest. Incluye los golden de `test/golden/*.golden` (formato `lean:` / `tex:`), que
   además comprueban que KaTeX acepta cada salida.
-- Lint: todavía no hay.
+- `npm run test:integration`: VS Code real + extensión oficial de Lean sobre
+  `examples/lean-sample` (requiere `lake build` allí). En Linux sin pantalla: `xvfb-run -a …`.
+- `npm run package`: genera `lean-blackboard.vsix` en la raíz. Instalar con
+  `code --install-extension lean-blackboard.vsix`.
+- `npm run export-rules`: regenera `lean/LeanBlackboard/defaultRules.json` desde
+  `packages/core/src/rules/defaultRules.ts` (fuente única; un test falla si está desactualizado).
 
 Paquete Lean compañero (desde `lean/`):
 
 - `lake build`: compila `LeanBlackboard`.
 - `lake build LeanBlackboardTest`: tests golden del printer (`#guard_msgs` sobre `#latex`).
 
-`examples/lean-sample` depende de `lean/` por ruta: `LeanSample.lean` lo importa (modo preciso) y
-`FastSample.lean` no (modo rápido).
+Ejemplos:
+
+- `examples/lean-sample`: depende de `lean/` por ruta. `LeanSample.lean` lo importa (modo preciso)
+  y `FastSample.lean` no (modo rápido). Lo usan los tests de integración.
+- `examples/lean-mathlib`: Mathlib `v4.34.1` + `lean/`. `lake exe cache get` (varios GB) y
+  `lake build MathlibGolden` para los golden del modo preciso sobre Mathlib. `PP.lean` genera la
+  entrada real de `test/golden/mathlib.golden`.
+
+CI: `.github/workflows/ci.yml` (node, lean, integración con xvfb, Mathlib).
 
 `packages/core` no se compila por separado: se consume como TypeScript fuente (`main` apunta a
 `src/index.ts`) y esbuild lo empaqueta.
 
 Probar a mano: F5 en VS Code con la configuración "Run Extension (lean-sample)" (abre
 `examples/lean-sample`) o "Run Extension (empty window)" (sin ficheros Lean).
-`cd examples/lean-sample && lake build` compila el proyecto de ejemplo.

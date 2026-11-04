@@ -8,6 +8,18 @@
   y `Copy`. El cambio por fila se recuerda mientras no cambies la notación global (que lo
   reinicia).
 - `Copy` copia siempre el LaTeX de la fila (por ejemplo `\mathrm{hpq} : p \to q`).
+- `Copy all` (junto al número de objetivos) o el comando `Lean Blackboard: Copy Goal State as
+  LaTeX` (icono en la barra del panel) copian todo el estado: un bloque `\[ \begin{array}{l} …`
+  por objetivo, hipótesis encima de una raya y el objetivo debajo.
+
+## Otras funciones del panel
+
+- **Tipo esperado**: dentro de un término (`exact foo _`, `fun x => …`) aparece una sección
+  *Expected type*, como en la InfoView.
+- **Fórmulas largas**: si no caben en el ancho del panel se parten en líneas por los operadores de
+  nivel superior (cuantificadores, ⇒, ∨, ∧, relaciones, +). Se recalcula al cambiar el ancho.
+- **Interactividad (solo modo preciso)**: al pasar el ratón por una subexpresión se resalta y
+  aparece su tipo; Ctrl+clic (⌘+clic en macOS) abre su definición.
 
 ## Reglas propias: `leanBlackboard.customRules`
 

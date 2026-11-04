@@ -15,6 +15,13 @@ en el servidor de Lean y devuelve LaTeX. Lo que cambia:
 | `if c then a else b` | `\texttt{}` | `cases` |
 | `↑n` | n | n |
 
+Además, solo en modo preciso: al pasar el ratón por una subexpresión se ve su tipo, y Ctrl/Cmd+clic
+abre su definición (Lean core, Mathlib o tu propio proyecto).
+
+Con Mathlib, también: `deriv (fun x => …) x` como d/dx, integrales `∫_a^b … dx`, límites
+`Tendsto f atTop (nhds l)` como lim, `∃!`, conjuntos por comprensión `{x ∈ ℝ | …}` y la inclusión
+de conjuntos (Mathlib elabora `s ⊆ t` como `s ≤ t`; el modo preciso lo devuelve a ⊆ por el tipo).
+
 Las reglas propias `functions` y `symbols` (`leanBlackboard.customRules`) se aplican en los dos
 modos; las de operadores (`infix`, `prefix`…) solo en el rápido. Las macros se aplican siempre.
 
