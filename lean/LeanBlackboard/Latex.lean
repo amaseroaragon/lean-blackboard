@@ -31,6 +31,8 @@ structure Tex where
   prec : Nat := maxPrec
   /-- A negation `-a`: parenthesised when it is a right operand. -/
   isNeg : Bool := false
+  /-- `s` without this term's own interactivity marker (for comparisons such as "is it `1`?"). -/
+  raw : String := s
   deriving Inhabited
 
 def Tex.paren (t : Tex) (p : Nat) : String :=
@@ -55,12 +57,44 @@ structure Rules where
 structure Ctx where
   symbols : Std.HashMap String String := {}
   functions : Std.HashMap String FunctionRule := {}
+  /-- Wrap subterms in `\htmlData{lbid=N}{…}` and record them (interactive panel). -/
+  markers : Bool := false
 
-def Ctx.ofRules (r : Rules) : Ctx where
+def Ctx.ofRules (r : Rules) (markers := false) : Ctx where
   symbols := r.symbols.foldl (fun m s => m.insert s.name s.latex) {}
   functions := r.functions.foldl (fun m f => m.insert f.name f) {}
+  markers
 
-abbrev LatexM := ReaderT Ctx MetaM
+/-- Where a constant is declared (LSP: 0-based lines). -/
+structure DeclLocation where
+  uri : String
+  line : Nat
+  character : Nat
+  deriving FromJson, ToJson
+
+/-- What the panel shows when hovering a marked subterm. -/
+structure SubexprData where
+  /-- The subterm as LaTeX (without markers) and as Lean text. -/
+  latex : String
+  expr : String
+  /-- Its type as LaTeX and as Lean text. -/
+  typeLatex : String
+  type : String
+  /-- Head constant, and where it is declared (for go-to-definition). -/
+  const? : Option String := none
+  location? : Option DeclLocation := none
+  deriving FromJson, ToJson
+
+/-- Upper bound on marked subterms per request, to bound the cost of computing their types. -/
+def maxSubexprs : Nat := 400
+
+structure LatexState where
+  subexprs : Array SubexprData := #[]
+  locations : Std.HashMap Name (Option DeclLocation) := {}
+  /-- URI of the current document: constants declared in it have no module to look up. -/
+  currentUri : String := ""
+
+abbrev LatexM := ReaderT Ctx (StateRefT LatexState MetaM)
 
 /--
 Templates ending in a closing delimiter (`\sqrt{…}`, `\left|…\right|`, `\binom{…}{…}`) are
@@ -70,6 +104,41 @@ def closesWithDelimiter (template : String) : Bool :=
   let t := template.trimAsciiEnd.toString
   t.endsWith "}" || [")", "]", "|", "\\|", "\\rfloor", "\\rceil", "\\rangle"].any fun d =>
     t.endsWith ("\\right" ++ d) || (d.startsWith "\\r" && t.endsWith d)
+
+/-- Removes `\htmlData{…}{` wrappers (keeping their contents). -/
+partial def stripMarkers (s : String) : String := Id.run do
+  let open_ := "\\htmlData{"
+  let cs := s.toList.toArray
+  let mut out := ""
+  -- Depths at which a wrapper's content group closes.
+  let mut closers : List Nat := []
+  let mut depth := 0
+  let mut i := 0
+  while i < cs.size do
+    if (String.ofList (cs[i:i + open_.length].toList)) == open_ then
+      -- Skip `\htmlData{key=value}{`.
+      let mut j := i + open_.length
+      while j < cs.size && cs[j]! != '}' do j := j + 1
+      i := j + 2
+      depth := depth + 1
+      closers := depth :: closers
+      continue
+    let c := cs[i]!
+    if c == '\\' && i + 1 < cs.size then
+      out := out.push c |>.push cs[i+1]!
+      i := i + 2
+      continue
+    if c == '{' then depth := depth + 1
+    if c == '}' then
+      if closers.head? == some depth then
+        closers := closers.tail
+        depth := depth - 1
+        i := i + 1
+        continue
+      depth := depth - 1
+    out := out.push c
+    i := i + 1
+  return out
 
 /-- `Set α` / `Finset α`: `≤`/`<` on them is inclusion. -/
 def isSetType (t : Expr) : Bool :=
@@ -167,10 +236,53 @@ private def binderPred? (x : Expr) (e : Expr) : Option (String × Expr) :=
 mutual
 
 partial def render (e : Expr) : LatexM Tex := do
-  try
-    renderCore e
-  catch _ =>
-    fallback e
+  let t ← try renderCore e catch _ => fallback e
+  if !(← read).markers || !isMarkable e then return t
+  if (← get).subexprs.size ≥ maxSubexprs then return t
+  match ← (try some <$> subexprData e t catch _ => pure none) with
+  | none => return t
+  | some data =>
+    let id := (← get).subexprs.size
+    modify fun st => { st with subexprs := st.subexprs.push data }
+    return { t with s := s!"\\htmlData\{lbid={id}}\{{t.s}}", raw := t.s }
+
+/--
+Terms worth a hover: names and applications. Not binders, and not raw literals: they only occur
+inside `OfNat.ofNat`, whose application carries the right type (`2 : ℝ`, not `2 : ℕ`).
+-/
+partial def isMarkable (e : Expr) : Bool :=
+  match e.consumeMData with
+  | .fvar .. | .const .. | .app .. => true
+  | _ => false
+
+partial def subexprData (e : Expr) (t : Tex) : LatexM SubexprData := do
+  let ty ← instantiateMVars (← inferType e)
+  -- The type is rendered without markers: hovering inside a hover is not supported.
+  let tyT ← withReader ({ · with markers := false }) (render ty)
+  let const? := e.getAppFn.consumeMData.constName?
+  let location? ← match const? with
+    | some c => declLocation c
+    | none => pure none
+  return {
+    latex := stripMarkers t.s, expr := toString (← ppExpr e),
+    typeLatex := tyT.s, type := toString (← ppExpr ty),
+    const? := const?.map (·.toString), location? }
+
+/-- Declaration site of a constant (cached per request). -/
+partial def declLocation (c : Name) : LatexM (Option DeclLocation) := do
+  if let some l := (← get).locations.get? c then return l
+  let loc ← try
+      let some ranges ← findDeclarationRanges? c | pure none
+      let env ← getEnv
+      let uri? ← match env.getModuleIdxFor? c with
+        | some idx => Server.documentUriFromModule? (env.header.moduleNames[idx.toNat]!)
+        | none => pure (some (← get).currentUri)
+      pure <| uri?.map fun uri =>
+        { uri, line := ranges.selectionRange.pos.line - 1,
+          character := ranges.selectionRange.pos.column : DeclLocation }
+    catch _ => pure none
+  modify fun st => { st with locations := st.locations.insert c loc }
+  return loc
 
 partial def fallback (e : Expr) : LatexM Tex := do
   let fmt ← try ppExpr e catch _ => pure (format "?")
@@ -344,7 +456,7 @@ partial def renderDeriv (f x : Expr) : LatexM (Option Tex) := do
   some <$> withFunBody f `x fun v body => do
     let b ← render body
     let d := s!"\\frac\{d}\{d{v}}\\left({b.s}\\right)"
-    if xT.s == v then return atom d
+    if xT.raw == v then return atom d
     return atom s!"\\left.{d}\\right|_\{{v} = {xT.s}}"
 
 /-- `∫_a^b f x dx` (interval) or `∫_s f x dx` (restricted measure) or `∫ f x dx`. -/
@@ -407,7 +519,7 @@ partial def renderBigOp (op : String) (s f : Expr) : LatexM (Option Tex) := do
     if let (.const `Finset.range _, #[m]) := (s.getAppFn, s.getAppArgs) then
       let upper ← match m.getAppFn, m.getAppArgs with
         | .const ``HAdd.hAdd _, #[_, _, _, _, k, one] =>
-          if (← render one).s == "1" then pure (← render k).s else pure s!"{(← render m).s} - 1"
+          if (← render one).raw == "1" then pure (← render k).s else pure s!"{(← render m).s} - 1"
         | _, _ => pure s!"{(← render m).paren 66} - 1"
       return some { s := s!"{op}_\{{name}=0}^\{{upper}} {bodyS}", prec := 67 }
     let sT ← render s
@@ -479,6 +591,14 @@ end
 /-- Renders `e` (in the current local context) as LaTeX. Never throws. -/
 def exprToLatex (e : Expr) (rules : Rules := {}) : MetaM String := do
   let e ← instantiateMVars e
-  return (← (render e).run (Ctx.ofRules rules)).s
+  return (← ((render e).run (Ctx.ofRules rules)).run' {}).s
+
+/--
+Like `exprToLatex`, with interactivity markers: subterms are wrapped in `\htmlData{lbid=N}{…}`
+where `N` indexes `LatexState.subexprs`. Thread the state through all calls of one response.
+-/
+def exprToLatexMarked (e : Expr) (rules : Rules) : StateRefT LatexState MetaM String := do
+  let e ← instantiateMVars e
+  return (← (render e).run (Ctx.ofRules rules (markers := true))).s
 
 end LeanBlackboard

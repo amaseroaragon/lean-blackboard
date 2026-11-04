@@ -3,6 +3,7 @@
 // `'unsafe-inline'`.
 
 import type {
+  SubexprView,
   GoalView,
   HostMessage,
   HypView,
@@ -11,7 +12,7 @@ import type {
   ViewConfig,
   WebviewMessage,
 } from '@lean-blackboard/core';
-import { breakLatex, goalsToLatexDocument } from '@lean-blackboard/core';
+import { breakLatex, goalsToLatexDocument, stripMarkers } from '@lean-blackboard/core';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import './panel.css';
@@ -86,7 +87,8 @@ function renderKatex(target: HTMLElement, latex: string, lean: string): void {
       throwOnError: true,
       displayMode: false,
       strict: 'ignore',
-      trust: false,
+      // Only `\\htmlData` (interactivity markers from the precise mode) is trusted.
+      trust: (ctx) => ctx.command === '\\htmlData',
       maxExpand: 1000,
       maxSize: 20,
       // KaTeX may mutate the object (\gdef): give it a copy.
@@ -127,7 +129,7 @@ function renderRow(row: Row): HTMLElement {
     button(notation === 'math' ? 'Lean' : 'Math', notation === 'math' ? 'Show Lean syntax' : 'Show math notation', () =>
       toggleRow(row.key),
     ),
-    button('Copy', 'Copy LaTeX', () => vscode.postMessage({ type: 'copy', text: row.latex })),
+    button('Copy', 'Copy LaTeX', () => vscode.postMessage({ type: 'copy', text: stripMarkers(row.latex) })),
   );
   return el('div', `row ${row.className}`, content, actions);
 }
@@ -145,16 +147,19 @@ function render(): void {
  * until they fit (or nothing more can be split; then the row scrolls horizontally).
  */
 function fitFormulas(): void {
-  for (const node of root.querySelectorAll<HTMLElement>('.content[data-latex]')) {
-    const latex = node.dataset.latex ?? '';
-    const lean = node.dataset.lean ?? '';
-    let previous = latex;
-    for (let depth = 1; depth <= MAX_BREAK_DEPTH && node.scrollWidth > node.clientWidth + 1; depth++) {
-      const broken = breakLatex(latex, depth);
-      if (broken === previous) break;
-      renderKatex(node, broken, lean);
-      previous = broken;
-    }
+  for (const node of root.querySelectorAll<HTMLElement>('.content[data-latex]')) fitNode(node);
+}
+
+/** Re-renders one formula (already in the DOM, with `data-latex`) broken into lines if too wide. */
+function fitNode(node: HTMLElement): void {
+  const latex = node.dataset.latex ?? '';
+  const lean = node.dataset.lean ?? '';
+  let previous = latex;
+  for (let depth = 1; depth <= MAX_BREAK_DEPTH && node.scrollWidth > node.clientWidth + 1; depth++) {
+    const broken = breakLatex(latex, depth);
+    if (broken === previous) break;
+    renderKatex(node, broken, lean);
+    previous = broken;
   }
 }
 
@@ -250,10 +255,69 @@ function diffClass(base: string, inserted: boolean, removed: boolean): string {
   return base + (inserted ? ' inserted' : '') + (removed ? ' removed' : '');
 }
 
+// ---------------------------------------------------------------------------
+// Interactivity (precise mode): hover a subterm to see its type, Ctrl/Cmd+click to open its
+// declaration. Subterms carry `data-lbid` from `\\htmlData{lbid=N}{…}`.
+// ---------------------------------------------------------------------------
+
+const tooltip = el('div', 'lb-tooltip hidden');
+document.body.append(tooltip);
+let hovered: HTMLElement | undefined;
+const isMac = navigator.userAgent.includes('Mac');
+
+function subexprOf(node: HTMLElement): SubexprView | undefined {
+  const id = Number(node.dataset.lbid);
+  return panelState.kind === 'goals' ? panelState.subexprs?.[id] : undefined;
+}
+
+function setHovered(node: HTMLElement | undefined, x: number, y: number): void {
+  if (node !== hovered) {
+    hovered?.classList.remove('lb-hover');
+    hovered = node;
+    hovered?.classList.add('lb-hover');
+  }
+  const data = node ? subexprOf(node) : undefined;
+  if (!node || !data) {
+    tooltip.classList.add('hidden');
+    return;
+  }
+  const formula = el('div', 'lb-tooltip-math');
+  const parts: Node[] = [formula];
+  if (data.const) {
+    const hint = data.location ? ` — ${isMac ? '⌘' : 'Ctrl'}+click to go to definition` : '';
+    parts.push(el('div', 'lb-tooltip-hint', `${data.const}${hint}`));
+  }
+  tooltip.replaceChildren(...parts);
+  tooltip.classList.remove('hidden');
+  // Rendered once visible, so that long types can be broken to the tooltip's width.
+  renderMath(formula, `${data.latex} : ${data.typeLatex}`, `${data.expr} : ${data.type}`);
+  fitNode(formula);
+  // Below the pointer, kept inside the panel.
+  const left = Math.max(4, Math.min(x + 8, window.innerWidth - tooltip.offsetWidth - 4));
+  const top = y + 16 + tooltip.offsetHeight > window.innerHeight ? y - tooltip.offsetHeight - 8 : y + 16;
+  tooltip.style.left = `${left}px`;
+  tooltip.style.top = `${Math.max(4, top)}px`;
+}
+
+root.addEventListener('mousemove', (e) => {
+  const target = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-lbid]') : null;
+  setHovered(target ?? undefined, e.clientX, e.clientY);
+});
+root.addEventListener('mouseleave', () => setHovered(undefined, 0, 0));
+root.addEventListener('click', (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const target = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-lbid]') : null;
+  const location = target ? subexprOf(target)?.location : undefined;
+  if (!location) return;
+  e.preventDefault();
+  vscode.postMessage({ type: 'goto', ...location });
+});
+
 window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
   const msg = e.data;
   if (msg?.type === 'state') {
     panelState = msg.state;
+    setHovered(undefined, 0, 0);
   } else if (msg?.type === 'config') {
     // A new global notation resets the per-row choices.
     if (saved.notation !== undefined && saved.notation !== msg.config.notation) overrides = {};

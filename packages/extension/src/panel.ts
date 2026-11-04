@@ -54,6 +54,14 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
           this.postConfig();
           this.post();
           break;
+        case 'goto': {
+          // Only local files (declarations come from the Lean server's search path).
+          const uri = vscode.Uri.parse(m.uri);
+          if (uri.scheme !== 'file') break;
+          const pos = new vscode.Position(m.line, m.character);
+          void vscode.window.showTextDocument(uri, { selection: new vscode.Range(pos, pos), preview: true });
+          break;
+        }
         case 'copy':
           void vscode.env.clipboard.writeText(m.text).then(() => {
             vscode.window.setStatusBarMessage('Lean Blackboard: LaTeX copied', 2000);

@@ -139,6 +139,39 @@ pre {
   border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
 }
 
+/* Interactivity (precise mode). */
+.lb-hover {
+  border-radius: 2px;
+  background: var(--vscode-editor-hoverHighlightBackground);
+}
+
+.lb-tooltip {
+  position: fixed;
+  z-index: 10;
+  max-width: calc(100vw - 16px);
+  padding: 4px 6px;
+  border: 1px solid var(--vscode-editorHoverWidget-border);
+  border-radius: 3px;
+  background: var(--vscode-editorHoverWidget-background);
+  color: var(--vscode-editorHoverWidget-foreground);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.lb-tooltip.hidden {
+  display: none;
+}
+
+.lb-tooltip-math {
+  overflow: hidden;
+}
+
+.lb-tooltip-hint {
+  margin-top: 2px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.85em;
+}
+
 .inserted {
   background: var(--vscode-diffEditor-insertedTextBackground);
 }

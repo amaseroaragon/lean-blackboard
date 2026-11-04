@@ -44,12 +44,27 @@ export type PanelState =
       goals: GoalView[] | null;
       /** Expected type of the term at the cursor (term mode), if any. */
       termGoal?: GoalView;
+      /**
+       * Precise mode only: data for the subterms marked `\\htmlData{lbid=N}{…}` in the LaTeX,
+       * indexed by `N` (hover shows the type, Ctrl/Cmd+click goes to the definition).
+       */
+      subexprs?: SubexprView[];
       /** Set when the RPC path failed and `plainGoal` was used instead. */
       fallbackReason?: string;
       /** `precise`: LaTeX from the companion Lean package; `fast`: converted from text here. */
       mode: ConversionMode;
     }
   | { kind: 'error'; location: string; message: string };
+
+export interface SubexprView {
+  latex: string;
+  expr: string;
+  typeLatex: string;
+  type: string;
+  const?: string;
+  /** Declaration site (LSP positions, 0-based). */
+  location?: { uri: string; line: number; character: number };
+}
 
 export type Notation = 'math' | 'lean';
 
@@ -68,4 +83,6 @@ export type HostMessage = { type: 'state'; state: PanelState } | { type: 'config
 export type WebviewMessage =
   | { type: 'ready' }
   /** Copy text to the clipboard (done by the host: more reliable than the webview clipboard). */
-  | { type: 'copy'; text: string };
+  | { type: 'copy'; text: string }
+  /** Open a declaration (Ctrl/Cmd+click on a subterm). */
+  | { type: 'goto'; uri: string; line: number; character: number };

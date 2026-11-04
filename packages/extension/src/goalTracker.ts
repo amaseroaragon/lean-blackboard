@@ -179,7 +179,7 @@ export class GoalTracker implements vscode.Disposable {
     if (checked !== undefined && Date.now() - checked < PRECISE_RETRY_MS) return undefined;
     try {
       const rules = this.settings.rules;
-      const res = await this.bridge.preciseGoals(uri, position, PRECISE_METHOD, rulesToWire(rules), token);
+      const res = await this.bridge.preciseGoals(uri, position, PRECISE_METHOD, rulesToWire(rules), token, true);
       this.noPrecise.delete(key);
       return preciseGoalsToView(res, rules);
     } catch (e) {

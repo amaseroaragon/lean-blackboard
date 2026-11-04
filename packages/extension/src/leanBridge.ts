@@ -224,8 +224,9 @@ export class LeanBridge implements vscode.Disposable {
     method: string,
     rules: unknown,
     token: vscode.CancellationToken,
+    interactive = false,
   ): Promise<unknown> {
-    const params = { textDocument: { uri: uri.toString() }, position, rules };
+    const params = { textDocument: { uri: uri.toString() }, position, rules, interactive };
     // The response holds no RPC references, so there is nothing to release.
     return this.rpcCall(uri, position, method, params, token, { releaseRefs: false });
   }

@@ -20,6 +20,9 @@ const CLASSES: { ops: string[]; binder?: boolean }[] = [
   { ops: [' + ', ' - '] },
 ];
 
+import { findMarkers, removeMarkers } from './markers';
+import type { Marker } from './markers';
+
 interface Split {
   parts: string[];
   /** `ops[i]` separates `parts[i]` and `parts[i + 1]`. */
@@ -27,12 +30,26 @@ interface Split {
   binder: boolean;
 }
 
-/** Positions at nesting depth 0 (outside `{}`, `\left…\right` and `\begin…\end`). */
-function topLevelMask(latex: string): boolean[] {
+/**
+ * Positions at nesting depth 0 (outside `{}`, `\left…\right` and `\begin…\end`). The given
+ * interactivity markers are transparent: their header is skipped and their braces do not nest.
+ */
+function topLevelMask(latex: string, transparent: Marker[] = []): boolean[] {
   const top: boolean[] = new Array(latex.length).fill(false);
+  const starts = new Map(transparent.map((m) => [m.start, m.contentStart]));
+  const closes = new Set(transparent.map((m) => m.close));
   let depth = 0;
   let i = 0;
   while (i < latex.length) {
+    const contentStart = starts.get(i);
+    if (contentStart !== undefined) {
+      i = contentStart;
+      continue;
+    }
+    if (closes.has(i)) {
+      i++;
+      continue;
+    }
     const rest = latex.slice(i);
     let m: RegExpMatchArray | null;
     if ((m = rest.match(/^\\(left|right)(\\[A-Za-z]+|\\.|.)/))) {
@@ -59,8 +76,42 @@ function topLevelMask(latex: string): boolean[] {
   return top;
 }
 
+/** Start indices of the loosest class's operators at the top level (empty if none). */
+function splitPoints(latex: string, top: boolean[]): number[] {
+  for (const cls of CLASSES) {
+    const points: number[] = [];
+    let start = 0;
+    let i = 0;
+    while (i < latex.length) {
+      const op = top[i] ? cls.ops.find((o) => latex.startsWith(o, i) && top[i + o.length - 1]) : undefined;
+      if (op !== undefined && latex.slice(start, i).trim() !== '') {
+        points.push(i);
+        i += op.length;
+        start = i;
+      } else {
+        i++;
+      }
+    }
+    if (points.length > 0) return points;
+  }
+  return [];
+}
+
+/**
+ * Removes the interactivity markers that a split would cut through (those containing a split
+ * point once markers are treated as transparent). Inner subterms keep their markers.
+ */
+function dropCrossingMarkers(latex: string): string {
+  const markers = findMarkers(latex);
+  if (markers.length === 0) return latex;
+  const points = splitPoints(latex, topLevelMask(latex, markers));
+  const crossing = markers.filter((m) => points.some((p) => p >= m.contentStart && p < m.close));
+  return crossing.length === 0 ? latex : removeMarkers(latex, crossing);
+}
+
 /** Splits at the loosest operator class present at the top level, or `undefined`. */
-export function splitTopLevel(latex: string): Split | undefined {
+export function splitTopLevel(input: string): Split | undefined {
+  const latex = dropCrossingMarkers(input);
   const top = topLevelMask(latex);
   for (const cls of CLASSES) {
     const parts: string[] = [];

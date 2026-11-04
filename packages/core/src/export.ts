@@ -2,6 +2,7 @@
 
 import type { GoalView } from './protocol';
 import { texttt } from './render/latex';
+import { stripMarkers } from './render/markers';
 
 /**
  * One `array` per goal: hypotheses, a rule, then the target (sequent style). Works in LaTeX
@@ -19,7 +20,7 @@ export function goalToLatexArray(goal: GoalView): string {
   }
   const target = `${goal.prefix.trim() === '⊢' ? '\\vdash' : texttt(goal.prefix.trim())} ${goal.typeLatex}`;
   const body = rows.length > 0 ? `${rows.join(' \\\\\n')} \\\\\n\\hline\n${target}` : target;
-  return `\\begin{array}{l}\n${body}\n\\end{array}`;
+  return stripMarkers(`\\begin{array}{l}\n${body}\n\\end{array}`);
 }
 
 /** All goals (and the expected type, if any) as display-math blocks separated by blank lines. */
