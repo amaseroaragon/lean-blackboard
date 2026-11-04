@@ -98,7 +98,8 @@ Con debounce de 150 ms la latencia del servidor es irrelevante en ficheros peque
 
 ## Pendiente de observar con F5
 
-Completar tras probar en el Extension Development Host:
+La fase se cerró el 2026-11-04 por decisión del usuario sin registrar aquí estas observaciones.
+Quedan como comprobaciones a repetir cuando haga falta:
 
 - [ ] Formas reales en VS Code (deberían ser las de arriba con `__rpcref` en vez de `p`).
 - [ ] Latencias reales a través del cliente oficial.

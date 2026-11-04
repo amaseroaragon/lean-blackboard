@@ -120,7 +120,7 @@ en `docs/spike-findings.md`.
 
 ## Fases
 
-### Fase 0: Spike de viabilidad ← ESTADO ACTUAL
+### Fase 0: Spike de viabilidad (cerrada 2026-11-04)
 Objetivo: demostrar que obtenemos los objetivos desde el cliente oficial, sin otro proceso.
 
 Alcance:
@@ -147,7 +147,7 @@ Criterios de aceptación (los comprueba el usuario a mano con F5 en el Extension
 Entregable adicional: una nota en `docs/spike-findings.md` con lo observado (formas reales de las
 respuestas, latencias, sorpresas) y las correcciones que haya que hacer a este documento.
 
-### Fase 1: Panel con texto plano
+### Fase 1: Panel con texto plano ← ESTADO ACTUAL
 `WebviewView` en la barra lateral que sigue al cursor y muestra hipótesis y objetivos como texto
 Lean (aplanando el `TaggedText`). Sin LaTeX todavía. Se aplican el estado "esperando a Lean" y la
 seguridad del webview (CSP estricta).
