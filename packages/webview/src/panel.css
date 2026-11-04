@@ -7,8 +7,6 @@ body {
 }
 
 .code,
-.names,
-.prefix,
 pre {
   font-family: var(--vscode-editor-font-family);
   font-size: var(--vscode-editor-font-size);
@@ -61,23 +59,26 @@ pre {
   font-style: italic;
 }
 
-.line {
-  padding: 1px 0;
+.math {
+  padding: 2px 0;
+  /* KaTeX does not wrap long formulas everywhere; scroll instead of overflowing. */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
-.names {
-  color: var(--vscode-symbolIcon-variableForeground, var(--vscode-textLink-foreground));
-  font-weight: 600;
+.math .katex {
+  font-size: 1.1em;
+  color: var(--vscode-foreground);
+}
+
+.fallback {
+  color: var(--vscode-foreground);
 }
 
 .target {
   margin-top: 4px;
   padding-top: 4px;
   border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
-}
-
-.prefix {
-  font-weight: 600;
 }
 
 .inserted {

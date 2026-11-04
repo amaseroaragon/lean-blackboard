@@ -2,7 +2,7 @@
 
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
-import type { HostMessage, PanelState, WebviewMessage } from './protocol';
+import type { HostMessage, PanelState, WebviewMessage } from '@lean-blackboard/core';
 
 export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewType = 'leanBlackboard.goals';
@@ -33,7 +33,7 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
     const webview = view.webview;
     webview.options = {
       enableScripts: true,
-      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist'), vscode.Uri.joinPath(this.extensionUri, 'media')],
+      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
     };
     webview.onDidReceiveMessage((m: WebviewMessage) => {
       if (m.type === 'ready') {
@@ -63,8 +63,10 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
 
   private html(webview: vscode.Webview): string {
     const nonce = randomBytes(16).toString('base64');
-    const script = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview.js'));
-    const style = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'panel.css'));
+    // Built by `packages/webview`: script, CSS (panel + KaTeX) and KaTeX fonts.
+    const base = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview');
+    const script = webview.asWebviewUri(vscode.Uri.joinPath(base, 'webview.js'));
+    const style = webview.asWebviewUri(vscode.Uri.joinPath(base, 'webview.css'));
     const csp = [
       "default-src 'none'",
       `style-src ${webview.cspSource}`,

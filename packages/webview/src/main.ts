@@ -1,7 +1,11 @@
-// Webview script: renders PanelState as plain text using DOM APIs only (no innerHTML),
-// so Lean output can never be interpreted as markup.
+// Webview script: renders PanelState with KaTeX. Built with DOM APIs only (no innerHTML), and
+// KaTeX's `render` builds DOM nodes with CSSOM styles, so it works under a strict CSP without
+// `'unsafe-inline'`.
 
-import type { GoalView, HostMessage, HypView, PanelState, WebviewMessage } from '../protocol';
+import type { GoalView, HostMessage, HypView, PanelState, WebviewMessage } from '@lean-blackboard/core';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
+import './panel.css';
 
 declare function acquireVsCodeApi(): { postMessage(msg: WebviewMessage): void };
 
@@ -21,6 +25,29 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 function message(text: string, className = 'message'): HTMLElement {
   return el('p', className, text);
+}
+
+/**
+ * Renders LaTeX into a block. If KaTeX rejects it (a conversion bug), shows the Lean text
+ * instead, so the panel is never empty. The Lean text is also available as a tooltip.
+ */
+function math(latex: string, leanText: string, className: string): HTMLElement {
+  const node = el('div', `math ${className}`);
+  node.title = leanText;
+  try {
+    katex.render(`\\displaystyle ${latex}`, node, {
+      throwOnError: true,
+      displayMode: false,
+      strict: 'ignore',
+      trust: false,
+      maxExpand: 1000,
+      maxSize: 20,
+    });
+  } catch (e) {
+    node.replaceChildren(el('span', 'code fallback', leanText));
+    node.title = `KaTeX could not render: ${e instanceof Error ? e.message : String(e)}`;
+  }
+  return node;
 }
 
 function render(state: PanelState): void {
@@ -66,14 +93,19 @@ function renderGoal(goal: GoalView): HTMLElement {
   const section = el('section', diffClass('goal', goal.isInserted, goal.isRemoved));
   if (goal.userName) section.append(el('div', 'case', `case ${goal.userName}`));
   section.append(...goal.hyps.map(renderHyp));
-  section.append(el('div', 'line target', el('span', 'prefix', goal.prefix), el('span', 'code', goal.type)));
+  const prefix = goal.prefix.trim() === '⊢' ? '\\vdash' : `\\texttt{${goal.prefix.trim()}}`;
+  section.append(math(`${prefix} ${goal.typeLatex}`, `${goal.prefix}${goal.type}`, 'target'));
   return section;
 }
 
 function renderHyp(h: HypView): HTMLElement {
-  const parts: (Node | string)[] = [el('span', 'names', h.names.join(' ')), ' : ', el('span', 'code', h.type)];
-  if (h.val !== undefined) parts.push(' := ', el('span', 'code', h.val));
-  return el('div', diffClass('line hyp', h.isInserted, h.isRemoved), ...parts);
+  let latex = `${h.namesLatex} : ${h.typeLatex}`;
+  let lean = `${h.names.join(' ')} : ${h.type}`;
+  if (h.val !== undefined && h.valLatex !== undefined) {
+    latex += ` \\coloneqq ${h.valLatex}`;
+    lean += ` := ${h.val}`;
+  }
+  return math(latex, lean, diffClass('hyp', h.isInserted, h.isRemoved));
 }
 
 function diffClass(base: string, inserted: boolean, removed: boolean): string {

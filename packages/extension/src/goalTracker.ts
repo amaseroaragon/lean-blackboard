@@ -2,7 +2,7 @@
 // Debounces updates, cancels the previous in-flight request and drops stale results.
 
 import * as vscode from 'vscode';
-import { interactiveGoalsToView, plainGoalToView } from './goals';
+import { interactiveGoalsToView, plainGoalToView } from '@lean-blackboard/core';
 import { CancelledError, LeanBridge, Position, describeError, ms } from './leanBridge';
 import type { GoalsPanel } from './panel';
 

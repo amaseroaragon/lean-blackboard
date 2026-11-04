@@ -1,0 +1,15 @@
+{
+  "name": "@lean-blackboard/webview",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Goals panel UI (runs inside the VS Code webview).",
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lean-blackboard/core": "*",
+    "katex": "~0.19.1"
+  }
+}

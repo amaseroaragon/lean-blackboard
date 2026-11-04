@@ -5,7 +5,7 @@
       "label": "build extension",
       "type": "npm",
       "script": "build",
-      "path": "packages/extension",
+      "path": "",
       "group": "build",
       "problemMatcher": []
     }
