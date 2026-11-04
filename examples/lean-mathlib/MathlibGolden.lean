@@ -79,3 +79,14 @@ variable (a x y δ ε : ℝ) (f : ℝ → ℝ) (n k : ℕ) (s t u : Set ℝ) (S 
 #guard_msgs in #latex S.card = 3
 /-- info: x \in \left[{0}, {1}\right] -/
 #guard_msgs in #latex x ∈ Set.Icc (0 : ℝ) 1
+
+-- Function coercions (`⇑f x`) render as applications; polynomial evaluation and monomials.
+section
+variable (P : Polynomial ℝ) (g₀ : ℝ →+ ℝ) (L : ℝ →L[ℝ] ℝ) (q : ℕ) (c : ℝ)
+/-- info: g_{0}\left(1\right) = g_{0}\left(x\right) + 2 -/
+#guard_msgs in #latex g₀ 1 = g₀ x + 2
+/-- info: L\left(x + 1\right) = 0 -/
+#guard_msgs in #latex L (x + 1) = 0
+/-- info: \left(c X^{q + 1}\right)\left({x}\right) = P\left({x}\right) -/
+#guard_msgs in #latex Polynomial.eval x ((Polynomial.monomial (q + 1)) c) = Polynomial.eval x P
+end

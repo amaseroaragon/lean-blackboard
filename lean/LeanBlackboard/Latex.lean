@@ -117,9 +117,25 @@ Templates ending in a closing delimiter (`\sqrt{…}`, `\left|…\right|`, `\bin
 self-delimiting: no parentheses are needed when they are, e.g., the base of a power.
 -/
 def closesWithDelimiter (template : String) : Bool :=
-  let t := template.trimAsciiEnd.toString
-  t.endsWith "}" || [")", "]", "|", "\\|", "\\rfloor", "\\rceil", "\\rangle"].any fun d =>
+  let t := template.trimAscii.toString
+  let delimited := [")", "]", "|", "\\|", "\\rfloor", "\\rceil", "\\rangle"].any fun d =>
     t.endsWith ("\\right" ++ d) || (d.startsWith "\\r" && t.endsWith d)
+  -- Or a single command whose braced arguments are the whole template (`\sqrt{#1}`,
+  -- `\binom{#1}{#2}`); not `#2 X^{#1}`, which merely ends in a brace.
+  let singleCommand := Id.run do
+    let cs := t.toList
+    let some ('\\', rest) := (cs.head?.map (·, cs.tail)) | return false
+    let name := rest.takeWhile Char.isAlpha
+    let mut groups := rest.drop name.length
+    if name.isEmpty || groups.isEmpty then return false
+    while !groups.isEmpty do
+      let '{' :: more := groups | return false
+      let body := more.takeWhile (fun c => c != '}' && c != '{')
+      match more.drop body.length with
+      | '}' :: after => groups := after
+      | _ => return false
+    return true
+  delimited || singleCommand
 
 /-- Removes `\htmlData{…}{` wrappers (keeping their contents). -/
 partial def stripMarkers (s : String) : String := Id.run do
@@ -191,9 +207,11 @@ def fillTemplate (template : String) (args : Array Tex) : String := Id.run do
 
 def atom (s : String) : Tex := { s }
 
-/-- Casts that core Lean does not tag `@[coe]` (Mathlib does), but `↑` prints anyway. -/
+/-- Coercions that `isCoeDecl` may not report, but that Lean prints as `↑`/`⇑`/`↥`. -/
 def knownCasts : List Name :=
-  [``Nat.cast, ``NatCast.natCast, `Int.cast, `IntCast.intCast, `Rat.cast, `RatCast.ratCast]
+  [``Nat.cast, ``NatCast.natCast, `Int.cast, `IntCast.intCast, `Rat.cast, `RatCast.ratCast,
+   -- Function and sort coercions (`⇑f x`, `↥s`) and subtype values (`↑x`).
+   `DFunLike.coe, ``CoeFun.coe, ``CoeSort.coe, ``Subtype.val]
 
 /-- `[a, b]` from `a :: b :: []`. -/
 partial def listLiteral? (e : Expr) : Option (Array Expr) :=
@@ -358,7 +376,11 @@ partial def renderApp (e : Expr) : LatexM Tex := do
     if let some t ← renderKnown c args then return t
     -- Coercions are invisible: show the coerced value.
     if isCoeDecl (← getEnv) c || knownCasts.contains c then
-      if let some x := (← explicitArgs f args).back? then return ← render x
+      let ex ← explicitArgs f args
+      -- `↑x`: just the value. `⇑g a b` (a coerced function applied, e.g. a linear map or a
+      -- bundled hom): `g` applied to `a b`, using `g`'s rule if it has one.
+      if ex.size == 1 then return ← render ex[0]!
+      if h : 1 < ex.size then return ← renderCoeApp ex[0] ex[1:].toArray
     let explicit ← explicitArgs f args
     if let some rule := (← read).functions.get? (c.toString (escape := false)) then
       if rule.arity ≤ explicit.size then
@@ -373,6 +395,21 @@ partial def renderApp (e : Expr) : LatexM Tex := do
   let head ← render f
   if explicit.isEmpty then return head
   return { s := head.paren maxPrec ++ (← argList explicit), prec := maxPrec }
+
+/-- `g` (a coerced function) applied to `rest`: merges with `g`'s own arguments for its rule. -/
+partial def renderCoeApp (g : Expr) (rest : Array Expr) : LatexM Tex := do
+  let gF := g.getAppFn
+  if let .const c' _ := gF then
+    if let some rule := (← read).functions.get? (c'.toString (escape := false)) then
+      let all := (← explicitArgs gF g.getAppArgs) ++ rest
+      if rule.arity ≤ all.size then
+        let applied := fillTemplate rule.template (← all[:rule.arity].toArray.mapM render)
+        let more := all[rule.arity:].toArray
+        let prec := if closesWithDelimiter rule.template then maxPrec else argPrec
+        if more.isEmpty then return { s := applied, prec }
+        return { s := applied ++ (← argList more), prec := argPrec }
+  let head ← render g
+  return { s := head.paren maxPrec ++ (← argList rest), prec := maxPrec }
 
 partial def argList (args : Array Expr) : LatexM String := do
   let parts ← args.mapM fun a => return (← render a).s
