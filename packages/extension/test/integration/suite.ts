@@ -101,6 +101,35 @@ test('expected type in term mode', async () => {
   assert.equal(s.termGoal?.kind === 'structured' && s.termGoal.typeLatex.includes('<'), true);
 });
 
+test('Before/After with changed subterms (precise mode)', async () => {
+  const editor = await openAt('LeanSample.lean', 'rw [Nat.mul_comm]');
+  const line = editor.selection.active.line;
+  editor.selection = new vscode.Selection(line, 100, line, 100); // end of line
+  const s = await waitFor('goals before', goalsWhere((s) => s.mode === 'precise' && (s.goalsBefore?.length ?? 0) > 0));
+  const before = s.goalsBefore?.[0];
+  const after = s.goals?.[0];
+  assert.ok(before?.kind === 'structured' && before.typeLatex.includes('lbdiff=old'), 'old subterm marked');
+  assert.ok(after?.kind === 'structured' && after.typeLatex.includes('lbdiff=new'), 'new subterm marked');
+});
+
+test('Before in fast mode', async () => {
+  const editor = await openAt('FastSample.lean', 'intro hpq hqr hp');
+  const line = editor.selection.active.line;
+  editor.selection = new vscode.Selection(line, 100, line, 100);
+  await waitFor('fast goals before', goalsWhere((s) => s.mode === 'fast' && (s.goalsBefore?.length ?? 0) > 0));
+});
+
+test('messages with expressions on the cursor line', async () => {
+  await openAt('Errors.lean', 'exact h');
+  const s = await waitFor('messages', goalsWhere((s) => (s.messages ?? []).some((m) => m.severity === 'error')));
+  const parts = s.messages?.flatMap((m) => m.parts) ?? [];
+  assert.ok(parts.some((p) => p.kind === 'expr' && p.latex.includes('<')), 'expression rendered as maths');
+});
+
+test('pin command runs', async () => {
+  await vscode.commands.executeCommand('leanBlackboard.pinGoalState');
+});
+
 test('a single Lean server process for the project', async () => {
   if (process.platform !== 'linux') return;
   const root = workspace().fsPath;
