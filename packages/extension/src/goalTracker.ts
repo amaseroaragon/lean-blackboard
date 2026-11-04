@@ -71,7 +71,11 @@ export class GoalTracker implements vscode.Disposable {
       // so ask again (debounced, and cancelling the previous request).
       vscode.languages.onDidChangeDiagnostics((e) => {
         const uri = this.leanEditor?.document.uri.toString();
-        if (uri !== undefined && e.uris.some((u) => u.toString() === uri)) this.schedule();
+        if (uri === undefined || !e.uris.some((u) => u.toString() === uri)) return;
+        // Elaboration progressed: a "method not found" seen while imports were still loading
+        // may no longer hold, so retry precise mode too.
+        this.noPrecise.delete(uri);
+        this.schedule();
       }),
       this.panel.onDidChangeVisibility((visible) => {
         if (visible) this.schedule();
