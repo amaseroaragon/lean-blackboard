@@ -140,7 +140,12 @@ function renderState(state: PanelState): Node[] {
     case 'error':
       return [location(state.location), message(state.message, 'message error')];
     case 'goals': {
-      const nodes: Node[] = [location(state.location)];
+      const badge = el('span', `badge ${state.mode}`, state.mode);
+      badge.title =
+        state.mode === 'precise'
+          ? 'Precise mode: LaTeX rendered by the LeanBlackboard Lean package from the real expressions'
+          : 'Fast mode: LaTeX converted from the pretty-printed text (import LeanBlackboard for precise mode)';
+      const nodes: Node[] = [el('div', 'location', state.location, ' ', badge)];
       if (state.fallbackReason) {
         nodes.push(message(`Showing plain goals (interactive goals failed: ${state.fallbackReason})`, 'message warning'));
       }

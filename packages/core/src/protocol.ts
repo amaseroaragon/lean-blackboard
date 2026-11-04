@@ -44,10 +44,14 @@ export type PanelState =
       goals: GoalView[] | null;
       /** Set when the RPC path failed and `plainGoal` was used instead. */
       fallbackReason?: string;
+      /** `precise`: LaTeX from the companion Lean package; `fast`: converted from text here. */
+      mode: ConversionMode;
     }
   | { kind: 'error'; location: string; message: string };
 
 export type Notation = 'math' | 'lean';
+
+export type ConversionMode = 'fast' | 'precise';
 
 /** Display settings, sent separately from the goals so they apply without a new request. */
 export interface ViewConfig {

@@ -2,13 +2,23 @@
 // Debounces updates, cancels the previous in-flight request and drops stale results.
 
 import * as vscode from 'vscode';
-import { interactiveGoalsToView, plainGoalToView } from '@lean-blackboard/core';
-import { CancelledError, LeanBridge, Position, describeError, ms } from './leanBridge';
+import {
+  PRECISE_METHOD,
+  PreciseProtocolError,
+  interactiveGoalsToView,
+  plainGoalToView,
+  preciseGoalsToView,
+  rulesToWire,
+} from '@lean-blackboard/core';
+import type { GoalView } from '@lean-blackboard/core';
+import { CancelledError, ERR_METHOD_NOT_FOUND, LeanBridge, Position, describeError, errorCode, ms } from './leanBridge';
 import type { GoalsPanel } from './panel';
 import type { Settings } from './settings';
 
 const DEBOUNCE_MS = 150;
 const MAX_JSON_CHARS = 8000;
+/** After "method not found", retry precise mode for that file after this long (imports change). */
+const PRECISE_RETRY_MS = 30_000;
 
 export class GoalTracker implements vscode.Disposable {
   private debounceTimer: NodeJS.Timeout | undefined;
@@ -16,6 +26,8 @@ export class GoalTracker implements vscode.Disposable {
   /** Last Lean editor that had focus; kept while focus is on non-Lean editors or panels. */
   private leanEditor: vscode.TextEditor | undefined;
   private readonly disposables: vscode.Disposable[] = [];
+  /** Files where the companion package is not available → time of the last check. */
+  private readonly noPrecise = new Map<string, number>();
 
   constructor(
     private readonly bridge: LeanBridge,
@@ -53,6 +65,7 @@ export class GoalTracker implements vscode.Disposable {
       }),
       this.bridge.onDidChangeState(() => this.schedule()),
       this.settings.onDidChangeRules(() => this.schedule()),
+      vscode.workspace.onDidSaveTextDocument((doc) => this.noPrecise.delete(doc.uri.toString())),
       this.panel.onDidChangeVisibility((visible) => {
         if (visible) this.schedule();
       }),
@@ -92,10 +105,22 @@ export class GoalTracker implements vscode.Disposable {
 
     const t0 = performance.now();
     try {
+      const precise = await this.tryPrecise(doc.uri, position, token);
+      if (token.isCancellationRequested) return;
+      if (precise !== undefined) {
+        this.log.debug(`getGoalsLatex ${location} (${ms(t0)})`);
+        this.panel.setState({ kind: 'goals', location, goals: precise, mode: 'precise' });
+        return;
+      }
       const res = await this.bridge.interactiveGoals(doc.uri, position, token);
       if (token.isCancellationRequested) return;
       this.log.debug(`getInteractiveGoals ${location} (${ms(t0)})`);
-      this.panel.setState({ kind: 'goals', location, goals: interactiveGoalsToView(res, this.settings.rules) });
+      this.panel.setState({
+        kind: 'goals',
+        location,
+        goals: interactiveGoalsToView(res, this.settings.rules),
+        mode: 'fast',
+      });
       return;
     } catch (e) {
       if (e instanceof CancelledError || token.isCancellationRequested) return;
@@ -104,7 +129,13 @@ export class GoalTracker implements vscode.Disposable {
       try {
         const plain = await this.bridge.plainGoal(doc.uri, position, token);
         if (token.isCancellationRequested) return;
-        this.panel.setState({ kind: 'goals', location, goals: plainGoalToView(plain), fallbackReason: reason });
+        this.panel.setState({
+          kind: 'goals',
+          location,
+          goals: plainGoalToView(plain),
+          fallbackReason: reason,
+          mode: 'fast',
+        });
       } catch (e2) {
         if (e2 instanceof CancelledError || token.isCancellationRequested) return;
         const msg = describeError(e2);
@@ -114,6 +145,38 @@ export class GoalTracker implements vscode.Disposable {
     } finally {
       if (this.inFlight === cts) this.inFlight = undefined;
       cts.dispose();
+    }
+  }
+
+  /**
+   * Precise mode if enabled and available for this file. `undefined` means "use fast mode";
+   * cancellation propagates as `CancelledError`.
+   */
+  private async tryPrecise(
+    uri: vscode.Uri,
+    position: Position,
+    token: vscode.CancellationToken,
+  ): Promise<GoalView[] | null | undefined> {
+    if (this.settings.mode === 'fast') return undefined;
+    const key = uri.toString();
+    const checked = this.noPrecise.get(key);
+    if (checked !== undefined && Date.now() - checked < PRECISE_RETRY_MS) return undefined;
+    try {
+      const rules = this.settings.rules;
+      const res = await this.bridge.preciseGoals(uri, position, PRECISE_METHOD, rulesToWire(rules), token);
+      this.noPrecise.delete(key);
+      return preciseGoalsToView(res, rules);
+    } catch (e) {
+      if (e instanceof CancelledError) throw e;
+      if (errorCode(e) === ERR_METHOD_NOT_FOUND) {
+        if (checked === undefined) this.log.info(`Precise mode not available for ${vscode.workspace.asRelativePath(uri)} (companion package not imported); using fast mode.`);
+      } else if (e instanceof PreciseProtocolError) {
+        this.log.warn(`Precise mode disabled for this file: ${e.message}`);
+      } else {
+        this.log.warn(`Precise mode failed (${describeError(e)}); using fast mode.`);
+      }
+      this.noPrecise.set(key, Date.now());
+      return undefined;
     }
   }
 
@@ -148,9 +211,12 @@ export class GoalTracker implements vscode.Disposable {
     const pos = editor.selection.active;
     const position: Position = { line: pos.line, character: pos.character };
     try {
-      const [plain, interactive] = await Promise.all([
+      const [plain, interactive, precise] = await Promise.all([
         timed(() => this.bridge.plainGoal(doc.uri, position, cts.token)),
         timed(() => this.bridge.interactiveGoals(doc.uri, position, cts.token)),
+        timed(() =>
+          this.bridge.preciseGoals(doc.uri, position, PRECISE_METHOD, rulesToWire(this.settings.rules), cts.token),
+        ),
       ]);
       const lines = [`── Goals at ${describeLocation(doc, pos)} ──`];
       lines.push(`plainGoal (${plain.latency}):`);
@@ -160,6 +226,9 @@ export class GoalTracker implements vscode.Disposable {
       lines.push(`getInteractiveGoals (${interactive.latency}):`);
       if ('error' in interactive) lines.push(`  ERROR ${interactive.error}`);
       else lines.push(indent(truncate(JSON.stringify(interactive.value, null, 2), MAX_JSON_CHARS)));
+      lines.push(`${PRECISE_METHOD} (${precise.latency}):`);
+      if ('error' in precise) lines.push(`  ERROR ${precise.error}`);
+      else lines.push(indent(truncate(JSON.stringify(precise.value, null, 2), MAX_JSON_CHARS)));
       this.log.info(lines.join('\n'));
     } finally {
       cts.dispose();

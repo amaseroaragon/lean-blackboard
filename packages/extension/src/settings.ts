@@ -4,6 +4,9 @@ import { defaultRules, mergeUserRules, sanitizeMacros } from '@lean-blackboard/c
 import type { Notation, Rules, ViewConfig } from '@lean-blackboard/core';
 import * as vscode from 'vscode';
 
+/** `auto`: precise mode when the companion package is available, else fast. */
+export type ModeSetting = 'auto' | 'fast';
+
 const SECTION = 'leanBlackboard';
 const NOTATION_KEY = 'leanBlackboard.notation';
 /** Context key used by the view title buttons (`when` clauses in package.json). */
@@ -12,12 +15,13 @@ const NOTATION_CONTEXT = 'leanBlackboard.notation';
 export class Settings implements vscode.Disposable {
   private _rules: Rules = defaultRules;
   private _macros: Record<string, string> = {};
+  private _mode: ModeSetting = 'auto';
   private _notation: Notation;
   private readonly rulesEmitter = new vscode.EventEmitter<void>();
   private readonly viewEmitter = new vscode.EventEmitter<ViewConfig>();
   private readonly disposables: vscode.Disposable[] = [];
 
-  /** Conversion rules changed: goals must be converted again. */
+  /** Conversion rules or mode changed: goals must be converted again. */
   readonly onDidChangeRules = this.rulesEmitter.event;
   /** Display settings changed: the webview re-renders without a new request. */
   readonly onDidChangeView = this.viewEmitter.event;
@@ -32,7 +36,8 @@ export class Settings implements vscode.Disposable {
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
         if (!e.affectsConfiguration(SECTION)) return;
-        const rulesChanged = e.affectsConfiguration(`${SECTION}.customRules`);
+        const rulesChanged =
+          e.affectsConfiguration(`${SECTION}.customRules`) || e.affectsConfiguration(`${SECTION}.mode`);
         this.load();
         if (rulesChanged) this.rulesEmitter.fire();
         this.viewEmitter.fire(this.view);
@@ -42,6 +47,10 @@ export class Settings implements vscode.Disposable {
 
   get rules(): Rules {
     return this._rules;
+  }
+
+  get mode(): ModeSetting {
+    return this._mode;
   }
 
   get view(): ViewConfig {
@@ -61,6 +70,7 @@ export class Settings implements vscode.Disposable {
     const macros = sanitizeMacros(config.get('macros'));
     this._rules = merged.rules;
     this._macros = macros.macros;
+    this._mode = config.get('mode') === 'fast' ? 'fast' : 'auto';
     const warnings = [...merged.warnings, ...macros.warnings];
     for (const w of warnings) this.log.warn(`Settings: ${w}`);
     if (warnings.length > 0) {

@@ -15,3 +15,11 @@ export { sanitizeMacros } from './rules/macros';
 export type { MacrosResult } from './rules/macros';
 export { flattenTaggedText } from './taggedText';
 export type { CodeWithInfos, TaggedText } from './taggedText';
+export {
+  PRECISE_METHOD,
+  PRECISE_PROTOCOL_VERSION,
+  PreciseProtocolError,
+  preciseGoalsToView,
+  rulesToWire,
+} from './precise';
+export type { WireRules } from './precise';

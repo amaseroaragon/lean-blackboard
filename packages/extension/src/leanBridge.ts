@@ -41,6 +41,8 @@ interface Lean4Exports {
 // Protocol constants (verified in lean4 `src/Lean/Data/JsonRpc.lean`, v4.34.1).
 // ---------------------------------------------------------------------------
 
+/** The RPC method is not registered (e.g. the companion package is not imported). */
+export const ERR_METHOD_NOT_FOUND = -32601;
 const ERR_REQUEST_CANCELLED = -32800;
 const ERR_CONTENT_MODIFIED = -32801;
 const ERR_RPC_NEEDS_RECONNECT = -32900;
@@ -212,6 +214,22 @@ export class LeanBridge implements vscode.Disposable {
     return this.rpcCall(uri, position, 'Lean.Widget.getInteractiveGoals', params, token, { releaseRefs: true });
   }
 
+  /**
+   * Precise mode: the companion package's `getGoalsLatex`. Rejects with code
+   * `ERR_METHOD_NOT_FOUND` if the package is not imported in this file.
+   */
+  async preciseGoals(
+    uri: vscode.Uri,
+    position: Position,
+    method: string,
+    rules: unknown,
+    token: vscode.CancellationToken,
+  ): Promise<unknown> {
+    const params = { textDocument: { uri: uri.toString() }, position, rules };
+    // The response holds no RPC references, so there is nothing to release.
+    return this.rpcCall(uri, position, method, params, token, { releaseRefs: false });
+  }
+
   private async rpcCall(
     uri: vscode.Uri,
     position: Position,
@@ -340,7 +358,7 @@ export class LeanBridge implements vscode.Disposable {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function errorCode(e: unknown): number | undefined {
+export function errorCode(e: unknown): number | undefined {
   if (typeof e === 'object' && e !== null && 'code' in e && typeof e.code === 'number') return e.code;
   return undefined;
 }

@@ -146,6 +146,19 @@
             "type": "string"
           },
           "markdownDescription": "KaTeX macros (equivalent to `\\newcommand`), usable in custom rules. Example: `{\"\\\\R\": \"\\\\mathbb{R}\", \"\\\\abs\": \"\\\\left|#1\\\\right|\"}`."
+        },
+        "leanBlackboard.mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "fast"
+          ],
+          "default": "auto",
+          "enumDescriptions": [
+            "Precise mode (LaTeX from the real expressions) when the file imports the companion package `LeanBlackboard`; fast mode otherwise.",
+            "Always use the fast, text-based conversion."
+          ],
+          "description": "Conversion mode."
         }
       }
     }
