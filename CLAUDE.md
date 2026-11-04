@@ -152,19 +152,23 @@ respuestas, latencias, sorpresas) y las correcciones que haya que hacer a este d
 Lean (aplanando el `TaggedText`). Sin LaTeX todavía. Se aplican el estado "esperando a Lean" y la
 seguridad del webview (CSP estricta).
 
-### Fase 2: Conversión y KaTeX ← ESTADO ACTUAL
+### Fase 2: Conversión y KaTeX (cerrada 2026-11-04)
 - `packages/core`: `TaggedText` → AST → LaTeX, con unas 30 reglas iniciales (`∀ ∃ → ↔ ∧ ∨ ¬ ∈ ⊆
   ∑ ∏`, fracciones, `√`, `|x|`, potencias, subíndices, `ℕ ℤ ℚ ℝ ℂ`).
 - Tests golden en `test/golden`.
 - KaTeX empaquetado en el webview, con respaldo `\texttt{}` cuando falle la conversión.
 
-### Fase 3: Usabilidad y extensibilidad
+### Fase 3: Usabilidad y extensibilidad ← ESTADO ACTUAL
 Toggle global y por hipótesis entre matemáticas y Lean, botón "copiar LaTeX", reglas de usuario en
 la configuración (`leanBlackboard.customRules`) y macros `\newcommand`.
 
 ### Fase 4: Modo preciso (paquete Lean compañero)
 Paquete Lake en `lean/` con un `@[server_rpc_method]` que devuelve LaTeX a partir del `Expr`. La
 extensión detecta si existe y cambia de modo sola. Evaluar reutilizar LeanTeX (Apache 2.0).
+Debe resolver lo que el modo rápido no puede saber sin tipos:
+- `→` como implicación (`\Rightarrow`) cuando es entre proposiciones y como `\to` en tipos de
+  función (decidido 2026-11-04: nada de heurísticas en el modo rápido).
+- `/` en `ℕ`/`ℤ` (división entera) frente a fracción real.
 
 ## Comandos
 
