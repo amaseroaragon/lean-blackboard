@@ -158,17 +158,21 @@ seguridad del webview (CSP estricta).
 - Tests golden en `test/golden`.
 - KaTeX empaquetado en el webview, con respaldo `\texttt{}` cuando falle la conversión.
 
-### Fase 3: Usabilidad y extensibilidad ← ESTADO ACTUAL
+### Fase 3: Usabilidad y extensibilidad (cerrada 2026-11-04)
 Toggle global y por hipótesis entre matemáticas y Lean, botón "copiar LaTeX", reglas de usuario en
 la configuración (`leanBlackboard.customRules`) y macros `\newcommand`.
 
-### Fase 4: Modo preciso (paquete Lean compañero)
+### Fase 4: Modo preciso (paquete Lean compañero) ← ESTADO ACTUAL
 Paquete Lake en `lean/` con un `@[server_rpc_method]` que devuelve LaTeX a partir del `Expr`. La
 extensión detecta si existe y cambia de modo sola. Evaluar reutilizar LeanTeX (Apache 2.0).
 Debe resolver lo que el modo rápido no puede saber sin tipos:
 - `→` como implicación (`\Rightarrow`) cuando es entre proposiciones y como `\to` en tipos de
   función (decidido 2026-11-04: nada de heurísticas en el modo rápido).
 - `/` en `ℕ`/`ℤ` (división entera) frente a fracción real.
+
+Decisiones (2026-11-04): printer propio solo con Lean core (LeanTeX descartado: anclado a
+v4.18.0-rc1, sin mantenimiento y con ProofWidgets); las reglas `functions`/`symbols` del cliente se
+envían en cada petición y se aplican también aquí. Detalles de uso en `docs/modo-preciso.md`.
 
 ## Comandos
 
@@ -183,6 +187,14 @@ Desde la raíz (npm workspaces: `packages/core`, `packages/webview`, `packages/e
 - `npm test`: vitest. Incluye los golden de `test/golden/*.golden` (formato `lean:` / `tex:`), que
   además comprueban que KaTeX acepta cada salida.
 - Lint: todavía no hay.
+
+Paquete Lean compañero (desde `lean/`):
+
+- `lake build`: compila `LeanBlackboard`.
+- `lake build LeanBlackboardTest`: tests golden del printer (`#guard_msgs` sobre `#latex`).
+
+`examples/lean-sample` depende de `lean/` por ruta: `LeanSample.lean` lo importa (modo preciso) y
+`FastSample.lean` no (modo rápido).
 
 `packages/core` no se compila por separado: se consume como TypeScript fuente (`main` apunta a
 `src/index.ts`) y esbuild lo empaqueta.
