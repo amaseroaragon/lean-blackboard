@@ -233,11 +233,17 @@ structure ExprsLatex where
   subexprs : Array SubexprData := #[]
   deriving FromJson, ToJson
 
-/-- Renders expressions from the infoview's references (used for expressions inside messages). -/
+/--
+Renders expressions from the infoview's references (used for expressions inside messages).
+
+Runs in a dedicated task (`asTask`), not inline: user RPC methods are invoked from a
+`(sync := true)` continuation, where rendering (which may wait for parallel elaboration) must
+not block. Doing it inline made Lean report "`Task.get` called from a `(sync := true)` task".
+-/
 @[server_rpc_method]
 def exprsLatex (p : ExprsLatexParams) : RequestM (RequestTask ExprsLatex) := do
   let uri := (← RequestM.readDoc).meta.uri
-  RequestM.pureTask do
+  RequestM.asTask do
     let r : Renderer := {
       rules := p.rules, interactive := p.interactive, state := ← IO.mkRef { currentUri := uri } }
     let latex ← p.infos.mapM fun i => do
