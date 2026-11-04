@@ -183,6 +183,16 @@
       "template": "\\left\\|{#1}\\right\\|"
     },
     {
+      "name": "Polynomial.eval",
+      "arity": 2,
+      "template": "#2\\left({#1}\\right)"
+    },
+    {
+      "name": "Polynomial.monomial",
+      "arity": 2,
+      "template": "#2 X^{#1}"
+    },
+    {
       "name": "Real.arctan",
       "arity": 1,
       "template": "\\arctan #1"

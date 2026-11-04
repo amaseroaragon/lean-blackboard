@@ -57,6 +57,16 @@ export function tokenize(input: string): Token[] {
       continue;
     }
 
+    // Metavariables (`?m.12`, `?u.85`, `?_`), e.g. universes in the statement of a lemma.
+    if (c === '?' && (isIdentStart(peek(1)) || /\p{Nd}/u.test(peek(1)))) {
+      let text = chars[i++];
+      while (i < chars.length && (isIdentRest(peek()) || (peek() === '.' && /[\p{L}\p{Nd}_]/u.test(peek(1))))) {
+        text += chars[i++];
+      }
+      tokens.push({ kind: 'ident', text });
+      continue;
+    }
+
     // Identifiers (possibly dotted: `Nat.succ`, `h.1`), `«quoted»` names, inaccessible `x✝¹`.
     if (isIdentStart(c) || c === '«') {
       let text = '';

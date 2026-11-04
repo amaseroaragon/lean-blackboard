@@ -113,6 +113,10 @@ export const defaultRules: Rules = {
     'Set.Ioi': { arity: 1, template: '\\left({#1}, \\infty\\right)' },
     'Set.Iic': { arity: 1, template: '\\left(-\\infty, {#1}\\right]' },
     'Set.Iio': { arity: 1, template: '\\left(-\\infty, {#1}\\right)' },
+    // `Polynomial.eval x p` is `p(x)`. `#2` (not `{#2}`) keeps `(P + Q)` parenthesised.
+    'Polynomial.eval': { arity: 2, template: '#2\\left({#1}\\right)' },
+    // `Polynomial.monomial n c` is `c X^n`.
+    'Polynomial.monomial': { arity: 2, template: '#2 X^{#1}' },
     // `deriv f x`. The precise mode renders `deriv (fun x => …) x` as d/dx itself.
     deriv: { arity: 2, template: "{#1}'\\left({#2}\\right)" },
     // Short names printed under `open Real` (fast mode only sees the text).

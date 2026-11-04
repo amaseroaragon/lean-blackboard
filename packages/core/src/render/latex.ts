@@ -28,7 +28,12 @@ export function texttt(text: string): string {
  * self-delimiting. Same rule as `closesWithDelimiter` in `lean/LeanBlackboard/Latex.lean`.
  */
 export function closesWithDelimiter(template: string): boolean {
-  return /(\}|\\right(\)|\]|\||\\\||\\rangle)|\\rfloor|\\rceil|\\rangle)\s*$/.test(template);
+  const t = template.trim();
+  // A closing delimiter at the end…
+  if (/(\\right(\)|\]|\||\\\||\\rangle)|\\rfloor|\\rceil|\\rangle)$/.test(t)) return true;
+  // …or a single command whose braced arguments are the whole template (`\sqrt{#1}`,
+  // `\binom{#1}{#2}`). Not `#2 X^{#1}`, which merely ends in a brace.
+  return /^\\[A-Za-z]+(\{[^{}]*\})+$/.test(t);
 }
 
 /** `Finset.range`, also printed as `range` under `open Finset`. */
@@ -125,6 +130,11 @@ export class LatexRenderer {
   }
 
   private renderApp(fn: Term, args: Term[]): string {
+    // `(f a) b` is the application `f a b` (Lean prints the parentheses for bundled maps, e.g.
+    // `(Polynomial.monomial n) c`): flatten it so that rules for `f` apply.
+    if (fn.k === 'paren' && fn.inner.k === 'app' && fn.inner.fn.k === 'ident') {
+      return this.renderApp(fn.inner.fn, [...fn.inner.args, ...args]);
+    }
     if (fn.k === 'ident') {
       const special = this.renderSpecial(fn.name, args);
       if (special !== undefined) return special;
@@ -141,6 +151,10 @@ export class LatexRenderer {
 
   /** Notations that need structure, not just a template: derivatives and limits. */
   private renderSpecial(name: string, args: Term[]): string | undefined {
+    // Universes: `Type u` → `\mathrm{Type}_{u}`.
+    if ((name === 'Type' || name === 'Sort') && args.length === 1) {
+      return `\\mathrm{${name}}_{${this.render(strip(args[0]))}}`;
+    }
     if (name === 'deriv' && args.length === 2) {
       const f = strip(args[0]);
       if (f.k !== 'binder' || f.q !== 'fun') return undefined;
