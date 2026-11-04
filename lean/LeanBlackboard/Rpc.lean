@@ -16,7 +16,7 @@ namespace LeanBlackboard
 open Lean Server Widget Meta
 
 /-- Bumped on incompatible changes to params or response. -/
-def protocolVersion : Nat := 3
+def protocolVersion : Nat := 4
 
 structure GoalsLatexParams where
   textDocument : Lsp.TextDocumentIdentifier
@@ -53,6 +53,11 @@ structure GoalsLatex where
   goals : Array GoalLatex
   /-- Expected type of the term at the position (term mode), as in the infoview. -/
   termGoal? : Option GoalLatex := none
+  /--
+  The goals before the tactic at the cursor, when the cursor is after it (so `goals` is the state
+  after). Changed subterms are marked `lbdiff=old` here and `lbdiff=new` in `goals`.
+  -/
+  goalsBefore? : Option (Array GoalLatex) := none
   /-- Data for marked subterms, indexed by the `lbid` in the LaTeX (empty if not interactive). -/
   subexprs : Array SubexprData := #[]
   deriving FromJson, ToJson
@@ -63,11 +68,27 @@ private structure Renderer where
   interactive : Bool
   state : IO.Ref LatexState
 
+abbrev Diff := Option DiffAgainst
+
+/--
+The other state's subterms, kept per role: targets are compared with targets, and each
+hypothesis with the hypothesis of the same name (otherwise `a * b` in some hypothesis would hide
+that it is new in the target).
+-/
+structure DiffSets where
+  target : Std.HashSet Expr := {}
+  hyps : Std.HashMap String (Std.HashSet Expr) := {}
+  all : Std.HashSet Expr := {}
+  kind : String
+
+private def hypKey (n : Name) : String := n.eraseMacroScopes.toString
+
 /-- LaTeX for an expression, or the Lean text in `\texttt` if anything goes wrong. -/
-private def safeLatex (r : Renderer) (e : Expr) (leanText : String) : MetaM String := do
+private def safeLatex (r : Renderer) (e : Expr) (leanText : String) (diff? : Diff := none) :
+    MetaM String := do
   try
     if r.interactive then
-      let (s, st) ← (exprToLatexMarked e r.rules).run (← r.state.get)
+      let (s, st) ← (exprToLatexMarked e r.rules diff?).run (← r.state.get)
       r.state.set st
       return s
     exprToLatex e r.rules
@@ -75,7 +96,8 @@ private def safeLatex (r : Renderer) (e : Expr) (leanText : String) : MetaM Stri
 
 /-- Hypotheses of a goal, rendered from the local declarations in `lctx`. -/
 private def hypsToLatex (r : Renderer) (lctx : LocalContext)
-    (hyps : Array InteractiveHypothesisBundle) : MetaM (Array HypLatex) :=
+    (hyps : Array InteractiveHypothesisBundle) (diff? : Option DiffSets := none) :
+    MetaM (Array HypLatex) :=
       hyps.mapM fun h => do
         let typeText := h.type.stripTags
         let valText := h.val?.map (·.stripTags)
@@ -83,9 +105,11 @@ private def hypsToLatex (r : Renderer) (lctx : LocalContext)
           | some fv =>
             match lctx.find? fv with
             | some ldecl =>
-              let t ← safeLatex r ldecl.type typeText
+              let diff? : Diff := diff?.bind fun d =>
+                (d.hyps.get? (hypKey ldecl.userName)).map fun part => { part, all := d.all, kind := d.kind }
+              let t ← safeLatex r ldecl.type typeText diff?
               let v ← match ldecl.value?, valText with
-                | some v, some vt => some <$> safeLatex r v vt
+                | some v, some vt => some <$> safeLatex r v vt diff?
                 | _, _ => pure none
               pure (t, v)
             | none => pure (texttt typeText, valText.map texttt)
@@ -94,13 +118,14 @@ private def hypsToLatex (r : Renderer) (lctx : LocalContext)
           names := h.names, type := typeText, typeLatex, val? := valText, valLatex?,
           isInserted? := h.isInserted?, isRemoved? := h.isRemoved? : HypLatex }
 
-private def goalToLatex (r : Renderer) (g : InteractiveGoal) : IO GoalLatex :=
+private def goalToLatex (r : Renderer) (g : InteractiveGoal) (diff? : Option DiffSets := none) :
+    IO GoalLatex :=
   g.ctx.val.runMetaM {} do
     let decl ← g.mvarId.getDecl
     withLCtx decl.lctx decl.localInstances do
-      let hyps ← hypsToLatex r decl.lctx g.hyps
+      let hyps ← hypsToLatex r decl.lctx g.hyps diff?
       let typeText := g.type.stripTags
-      let typeLatex ← safeLatex r (← g.mvarId.getType) typeText
+      let typeLatex ← safeLatex r (← g.mvarId.getType) typeText (diff?.map fun d => { part := d.target, all := d.all, kind := d.kind })
       return {
         userName? := g.userName?, goalPrefix := g.goalPrefix, hyps, type := typeText, typeLatex,
         isInserted? := g.isInserted?, isRemoved? := g.isRemoved? : GoalLatex }
@@ -115,9 +140,45 @@ private def termGoalToLatex (r : Renderer) (g : InteractiveTermGoal) : IO GoalLa
     let typeLatex ← safeLatex r ty typeText
     return { goalPrefix := "⊢ ", hyps, type := typeText, typeLatex : GoalLatex }
 
+/-- Adds a goal's target and hypothesis subterms (instantiated in its own context). -/
+private def goalSubterms (g : InteractiveGoal) (acc : DiffSets) : IO DiffSets :=
+  g.ctx.val.runMetaM {} do
+    let decl ← g.mvarId.getDecl
+    let target ← instantiateMVars decl.type
+    let mut acc := { acc with
+      target := collectSubterms target acc.target, all := collectSubterms target acc.all }
+    for ldecl in decl.lctx do
+      unless ldecl.isImplementationDetail do
+        let key := hypKey ldecl.userName
+        let ty ← instantiateMVars ldecl.type
+        acc := { acc with
+          hyps := acc.hyps.insert key (collectSubterms ty ((acc.hyps.get? key).getD {}))
+          all := collectSubterms ty acc.all }
+    return acc
+
+/--
+The goals at the start of the cursor's line (before its first tactic): "how the proof was before
+this step". `none` if the cursor is already at (or before) that point.
+-/
+private def goalsBefore (p : GoalsLatexParams) :
+    RequestM (RequestTask (Option (Array InteractiveGoal))) := do
+  let text := (← RequestM.readDoc).meta.text
+  let lineStart := text.lspPosToUtf8Pos { line := p.position.line, character := 0 }
+  let lineEnd := text.lspPosToUtf8Pos { line := p.position.line + 1, character := 0 }
+  -- Indentation is ASCII whitespace, so its length in characters is the LSP column.
+  let line := String.Pos.Raw.extract text.source lineStart lineEnd
+  let indent := line.takeWhile (· == ' ') |>.length
+  if p.position.character ≤ indent || line.trimAscii.isEmpty then
+    return ← RequestM.pureTask (pure none)
+  let t ← FileWorker.getInteractiveGoals
+    { textDocument := p.textDocument, position := { line := p.position.line, character := indent } }
+  return t.mapCheap fun
+    | .ok gs => .ok (gs.map (·.goals))
+    | .error e => .error e
+
 /--
 Goals (tactic mode) and expected type (term mode) at a position, with LaTeX rendered from the
-actual expressions. `none` if there is neither.
+actual expressions, plus the goals before the tactic. `none` if there are no goals at all.
 -/
 @[server_rpc_method]
 def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLatex)) := do
@@ -125,24 +186,69 @@ def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLa
     { textDocument := p.textDocument, position := p.position }
   let termTask ← FileWorker.getInteractiveTermGoal
     { textDocument := p.textDocument, position := p.position }
+  let beforeTask ← goalsBefore p
   RequestM.bindTaskCostly goalsTask fun goals? => do
+   RequestM.bindTaskCostly beforeTask fun before? => do
     RequestM.mapTaskCostly termTask fun term? => do
       let goals? ← match goals? with
         | .error e => throw e
         | .ok gs => pure gs
-      let term? ← match term? with
-        | .error _ => pure none -- the expected type is a bonus: never fail because of it
-        | .ok t => pure t
+      -- The expected type and the previous state are bonuses: never fail because of them.
+      let term? := match term? with
+        | .error _ => none
+        | .ok t => t
+      let before? := match before? with
+        | .error _ => none
+        | .ok b => b
       if goals?.isNone && term?.isNone then return none
       let r : Renderer := {
         rules := p.rules, interactive := p.interactive,
         state := ← IO.mkRef { currentUri := p.textDocument.uri } }
-      let goals ← match goals? with
-        | some gs => gs.goals.mapM fun g => (goalToLatex r g : IO _)
-        | none => pure #[]
+      let current := goals?.map (·.goals) |>.getD #[]
+      -- Before/after highlighting compares subterms of both states (interactive mode only).
+      let (diffNew, diffOld) ← match before?, p.interactive with
+        | some bs, true =>
+          let beforeSets ← bs.foldlM (fun acc g => (goalSubterms g acc : IO _)) { kind := "new" }
+          let afterSets ← current.foldlM (fun acc g => (goalSubterms g acc : IO _)) { kind := "old" }
+          pure (some beforeSets, some afterSets)
+        | _, _ => pure (none, none)
+      let goals ← current.mapM fun g => (goalToLatex r g diffNew : IO _)
+      let goalsBefore? ← before?.mapM (·.mapM fun g => (goalToLatex r g diffOld : IO _))
       let termGoal? ← match term? with
         | some t => some <$> (termGoalToLatex r t : IO _)
         | none => pure none
-      return some { goals, termGoal?, subexprs := (← r.state.get).subexprs }
+      return some { goals, termGoal?, goalsBefore?, subexprs := (← r.state.get).subexprs }
+
+structure ExprsLatexParams where
+  /-- Root `SubexprInfo.info` references of expressions embedded in messages. -/
+  infos : Array (WithRpcRef Elab.InfoWithCtx)
+  rules : Rules := {}
+  interactive : Bool := false
+  deriving RpcEncodable
+
+structure ExprsLatex where
+  version : Nat := protocolVersion
+  /-- One entry per input reference; empty string if it is not an expression. -/
+  latex : Array String
+  subexprs : Array SubexprData := #[]
+  deriving FromJson, ToJson
+
+/-- Renders expressions from the infoview's references (used for expressions inside messages). -/
+@[server_rpc_method]
+def exprsLatex (p : ExprsLatexParams) : RequestM (RequestTask ExprsLatex) := do
+  let uri := (← RequestM.readDoc).meta.uri
+  RequestM.pureTask do
+    let r : Renderer := {
+      rules := p.rules, interactive := p.interactive, state := ← IO.mkRef { currentUri := uri } }
+    let latex ← p.infos.mapM fun i => do
+      let i := i.val
+      let e? := match i.info with
+        | .ofTermInfo ti => some ti.expr
+        | .ofDelabTermInfo { toTermInfo := ti, .. } => some ti.expr
+        | _ => none
+      match e? with
+      | none => pure ""
+      | some e => (i.ctx.runMetaM i.info.lctx (safeLatex r e "") : IO String)
+    return { latex, subexprs := (← r.state.get).subexprs }
 
 end LeanBlackboard

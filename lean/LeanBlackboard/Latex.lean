@@ -54,11 +54,27 @@ structure Rules where
   functions : Array FunctionRule := #[]
   deriving FromJson, ToJson, Inhabited
 
+/-- What a term is compared with for before/after highlighting. -/
+structure DiffAgainst where
+  /-- Subterms of the corresponding part of the other state (target, or same-name hypothesis). -/
+  part : Std.HashSet Expr
+  /-- Subterms of the whole other state: atoms that merely moved (e.g. `intro`) are not marked. -/
+  all : Std.HashSet Expr
+  /-- Marker value: `new` (after the tactic) or `old` (before it). -/
+  kind : String
+
 structure Ctx where
   symbols : Std.HashMap String String := {}
   functions : Std.HashMap String FunctionRule := {}
   /-- Wrap subterms in `\htmlData{lbid=N}{…}` and record them (interactive panel). -/
   markers : Bool := false
+  /--
+  Before/after highlighting: subterms of the *other* state, and the marker value (`new` for the
+  state after a tactic, `old` for the state before it). Requires `markers`.
+  -/
+  diff? : Option DiffAgainst := none
+  /-- Free variables of the goal's context (the only ones that can match the other state). -/
+  goalFVars : Std.HashSet FVarId := {}
 
 def Ctx.ofRules (r : Rules) (markers := false) : Ctx where
   symbols := r.symbols.foldl (fun m s => m.insert s.name s.latex) {}
@@ -237,14 +253,32 @@ mutual
 
 partial def render (e : Expr) : LatexM Tex := do
   let t ← try renderCore e catch _ => fallback e
-  if !(← read).markers || !isMarkable e then return t
-  if (← get).subexprs.size ≥ maxSubexprs then return t
-  match ← (try some <$> subexprData e t catch _ => pure none) with
-  | none => return t
-  | some data =>
-    let id := (← get).subexprs.size
-    modify fun st => { st with subexprs := st.subexprs.push data }
-    return { t with s := s!"\\htmlData\{lbid={id}}\{{t.s}}", raw := t.s }
+  let ctx ← read
+  if !ctx.markers || !isMarkable e then return t
+  -- Key-value pairs of the `\htmlData` marker: hover id and/or diff status.
+  let mut keys : Array String := #[]
+  if (← get).subexprs.size < maxSubexprs then
+    if let some data ← (try some <$> subexprData e t catch _ => pure none) then
+      keys := keys.push s!"lbid={(← get).subexprs.size}"
+      modify fun st => { st with subexprs := st.subexprs.push data }
+  if let some d := ctx.diff? then
+    if isChanged ctx e d then keys := keys.push s!"lbdiff={d.kind}"
+  if keys.isEmpty then return t
+  return { t with s := s!"\\htmlData\{{", ".intercalate keys.toList}}\{{t.s}}", raw := t.s }
+
+/--
+A subterm counts as changed if it does not occur in the other state but its immediate parts do
+(or it is atomic): this marks the smallest node that changed, e.g. `b * a` after
+`rw [mul_comm]`, not the whole equation. Subterms under binders opened by the printer (whose free
+variables are not in the goal's context) are never marked: they cannot match the other state.
+-/
+partial def isChanged (ctx : Ctx) (e : Expr) (d : DiffAgainst) : Bool :=
+  let e := e.consumeMData
+  if e.hasAnyFVar (fun f => !ctx.goalFVars.contains f) then false
+  else if d.part.contains e then false
+  else match e with
+    | .app .. => (e.getAppFn :: e.getAppArgs.toList).all fun c => d.part.contains c.consumeMData
+    | _ => !d.all.contains e
 
 /--
 Terms worth a hover: names and applications. Not binders, and not raw literals: they only occur
@@ -597,8 +631,23 @@ def exprToLatex (e : Expr) (rules : Rules := {}) : MetaM String := do
 Like `exprToLatex`, with interactivity markers: subterms are wrapped in `\htmlData{lbid=N}{…}`
 where `N` indexes `LatexState.subexprs`. Thread the state through all calls of one response.
 -/
-def exprToLatexMarked (e : Expr) (rules : Rules) : StateRefT LatexState MetaM String := do
+def exprToLatexMarked (e : Expr) (rules : Rules) (diff? : Option DiffAgainst := none) :
+    StateRefT LatexState MetaM String := do
   let e ← instantiateMVars e
-  return (← (render e).run (Ctx.ofRules rules (markers := true))).s
+  let goalFVars := (← getLCtx).foldl (fun s d => s.insert d.fvarId) {}
+  return (← (render e).run { Ctx.ofRules rules (markers := true) with diff?, goalFVars }).s
+
+/-- All subterms of `e` (for before/after comparison). -/
+partial def collectSubterms (e : Expr) (acc : Std.HashSet Expr) : Std.HashSet Expr :=
+  let e := e.consumeMData
+  if acc.contains e then acc
+  else
+    let acc := acc.insert e
+    match e with
+    | .app f a => collectSubterms a (collectSubterms f acc)
+    | .lam _ t b _ | .forallE _ t b _ => collectSubterms b (collectSubterms t acc)
+    | .letE _ t v b _ => collectSubterms b (collectSubterms v (collectSubterms t acc))
+    | .proj _ _ b => collectSubterms b acc
+    | _ => acc
 
 end LeanBlackboard
