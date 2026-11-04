@@ -16,6 +16,7 @@ export type { MacrosResult } from './rules/macros';
 export { flattenTaggedText } from './taggedText';
 export type { CodeWithInfos, TaggedText } from './taggedText';
 export {
+  PRECISE_EXPRS_METHOD,
   PRECISE_METHOD,
   PRECISE_PROTOCOL_VERSION,
   PreciseProtocolError,
@@ -26,3 +27,5 @@ export type { PreciseView, WireRules } from './precise';
 export { goalToLatexArray, goalsToLatexDocument } from './export';
 export { breakLatex, splitTopLevel } from './render/break';
 export { stripMarkers } from './render/markers';
+export { applyPreciseExprs, interactiveDiagnosticsToView } from './messages';
+export type { MessagesResult } from './messages';

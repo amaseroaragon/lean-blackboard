@@ -45,6 +45,13 @@ export type PanelState =
       /** Expected type of the term at the cursor (term mode), if any. */
       termGoal?: GoalView;
       /**
+       * Goals at the start of the cursor's line ("before this step"), when the cursor is past it.
+       * In precise mode, changed subterms are marked `lbdiff=old` here and `lbdiff=new` in `goals`.
+       */
+      goalsBefore?: GoalView[];
+      /** Errors, warnings and infos on the cursor's line. */
+      messages?: MessageView[];
+      /**
        * Precise mode only: data for the subterms marked `\\htmlData{lbid=N}{…}` in the LaTeX,
        * indexed by `N` (hover shows the type, Ctrl/Cmd+click goes to the definition).
        */
@@ -55,6 +62,22 @@ export type PanelState =
       mode: ConversionMode;
     }
   | { kind: 'error'; location: string; message: string };
+
+export type Severity = 'error' | 'warning' | 'information' | 'hint';
+
+export type MessagePart =
+  | { kind: 'text'; text: string }
+  /** An expression embedded in the message. */
+  | { kind: 'expr'; latex: string; lean: string }
+  /** A goal embedded in the message (e.g. "unsolved goals"). */
+  | { kind: 'goal'; goal: GoalView };
+
+export interface MessageView {
+  severity: Severity;
+  /** 0-based line where the message starts. */
+  line: number;
+  parts: MessagePart[];
+}
 
 export interface SubexprView {
   latex: string;
@@ -78,11 +101,17 @@ export interface ViewConfig {
   macros: Record<string, string>;
 }
 
-export type HostMessage = { type: 'state'; state: PanelState } | { type: 'config'; config: ViewConfig };
+export type HostMessage =
+  | { type: 'state'; state: PanelState }
+  | { type: 'config'; config: ViewConfig }
+  /** Pin the goals currently shown (command `Lean Blackboard: Pin Goal State`). */
+  | { type: 'pin' };
 
 export type WebviewMessage =
   | { type: 'ready' }
   /** Copy text to the clipboard (done by the host: more reliable than the webview clipboard). */
   | { type: 'copy'; text: string }
   /** Open a declaration (Ctrl/Cmd+click on a subterm). */
-  | { type: 'goto'; uri: string; line: number; character: number };
+  | { type: 'goto'; uri: string; line: number; character: number }
+  /** Reveal a position in the current Lean editor (click on a message). */
+  | { type: 'reveal'; line: number };

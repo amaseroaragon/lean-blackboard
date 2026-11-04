@@ -12,7 +12,7 @@ describe('rulesToWire', () => {
 describe('preciseGoalsToView', () => {
   it('maps the wire format to the view model', () => {
     const res = {
-      version: 3,
+      version: 4,
       goals: [
         {
           userName: 'succ',
@@ -47,12 +47,18 @@ describe('preciseGoalsToView', () => {
   });
 
   it('rejects other protocol versions', () => {
-    expect(() => preciseGoalsToView({ version: 1, goals: [] }, defaultRules)).toThrow(PreciseProtocolError);
+    expect(() => preciseGoalsToView({ version: 3, goals: [] }, defaultRules)).toThrow(PreciseProtocolError);
   });
 
   it('keeps the subterm table for hovers', () => {
     const sub = { latex: 'x', expr: 'x', typeLatex: '\\mathbb{R}', type: 'ℝ' };
-    expect(preciseGoalsToView({ version: 3, goals: [], subexprs: [sub] }, defaultRules).subexprs).toEqual([sub]);
+    expect(preciseGoalsToView({ version: 4, goals: [], subexprs: [sub] }, defaultRules).subexprs).toEqual([sub]);
+  });
+
+  it('maps the goals before the step', () => {
+    const g = { goalPrefix: '⊢ ', hyps: [], type: 'q', typeLatex: 'q' };
+    const v = preciseGoalsToView({ version: 4, goals: [g], goalsBefore: [g, g] }, defaultRules);
+    expect(v.goalsBefore).toHaveLength(2);
   });
 
   it('passes null through', () => {
@@ -61,10 +67,10 @@ describe('preciseGoalsToView', () => {
 
   it('keeps the expected type; only-expected-type means no tactic state', () => {
     const termGoal = { goalPrefix: '⊢ ', hyps: [], type: 'Nat', typeLatex: '\\mathbb{N}' };
-    const v = preciseGoalsToView({ version: 3, goals: [], termGoal }, defaultRules);
+    const v = preciseGoalsToView({ version: 4, goals: [], termGoal }, defaultRules);
     expect(v.goals).toBeNull();
     expect(v.termGoal).toMatchObject({ kind: 'structured', typeLatex: '\\mathbb{N}' });
-    const both = preciseGoalsToView({ version: 3, goals: [termGoal], termGoal }, defaultRules);
+    const both = preciseGoalsToView({ version: 4, goals: [termGoal], termGoal }, defaultRules);
     expect(both.goals).toHaveLength(1);
   });
 });

@@ -6,7 +6,8 @@ import { identToLatex } from './render/ident';
 import type { Rules } from './rules/types';
 
 export const PRECISE_METHOD = 'LeanBlackboard.getGoalsLatex';
-export const PRECISE_PROTOCOL_VERSION = 3;
+export const PRECISE_EXPRS_METHOD = 'LeanBlackboard.exprsLatex';
+export const PRECISE_PROTOCOL_VERSION = 4;
 
 /** `Rules` in the shape the Lean side expects (only `symbols` and `functions` apply there). */
 export interface WireRules {
@@ -47,6 +48,7 @@ export interface PreciseView {
   goals: GoalView[] | null;
   termGoal?: GoalView;
   subexprs?: SubexprView[];
+  goalsBefore?: GoalView[];
 }
 
 /** Converts a `getGoalsLatex` response. Throws `PreciseProtocolError` on a version/shape mismatch. */
@@ -64,8 +66,12 @@ export function preciseGoalsToView(res: unknown, rules: Rules): PreciseView {
   const termGoal = 'termGoal' in res && res.termGoal ? goalToView(res.termGoal as WireGoal, rules) : undefined;
   const goals = (res.goals as WireGoal[]).map((g) => goalToView(g, rules));
   const subexprs = 'subexprs' in res && Array.isArray(res.subexprs) ? (res.subexprs as SubexprView[]) : undefined;
+  const goalsBefore =
+    'goalsBefore' in res && Array.isArray(res.goalsBefore)
+      ? (res.goalsBefore as WireGoal[]).map((g) => goalToView(g, rules))
+      : undefined;
   // Lean answers `goals: []` when it only has an expected type: that is "no tactic state".
-  return { goals: goals.length === 0 && termGoal ? null : goals, termGoal, subexprs };
+  return { goals: goals.length === 0 && termGoal ? null : goals, termGoal, subexprs, goalsBefore };
 }
 
 function goalToView(g: WireGoal, rules: Rules): GoalView {
