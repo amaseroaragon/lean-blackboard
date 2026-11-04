@@ -11,7 +11,7 @@ import type {
   ViewConfig,
   WebviewMessage,
 } from '@lean-blackboard/core';
-import { goalsToLatexDocument } from '@lean-blackboard/core';
+import { breakLatex, goalsToLatexDocument } from '@lean-blackboard/core';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import './panel.css';
@@ -75,6 +75,12 @@ function button(label: string, title: string, onClick: () => void): HTMLButtonEl
  * Lean text instead, so the panel is never empty.
  */
 function renderMath(target: HTMLElement, latex: string, lean: string): void {
+  target.dataset.latex = latex;
+  target.dataset.lean = lean;
+  renderKatex(target, latex, lean);
+}
+
+function renderKatex(target: HTMLElement, latex: string, lean: string): void {
   try {
     katex.render(`\\displaystyle ${latex}`, target, {
       throwOnError: true,
@@ -126,9 +132,41 @@ function renderRow(row: Row): HTMLElement {
   return el('div', `row ${row.className}`, content, actions);
 }
 
+/** Deepest line-breaking level tried for formulas wider than the panel. */
+const MAX_BREAK_DEPTH = 3;
+
 function render(): void {
   root.replaceChildren(...renderState(panelState));
+  fitFormulas();
 }
+
+/**
+ * Formulas wider than the panel are re-rendered broken into lines, one more level each time,
+ * until they fit (or nothing more can be split; then the row scrolls horizontally).
+ */
+function fitFormulas(): void {
+  for (const node of root.querySelectorAll<HTMLElement>('.content[data-latex]')) {
+    const latex = node.dataset.latex ?? '';
+    const lean = node.dataset.lean ?? '';
+    let previous = latex;
+    for (let depth = 1; depth <= MAX_BREAK_DEPTH && node.scrollWidth > node.clientWidth + 1; depth++) {
+      const broken = breakLatex(latex, depth);
+      if (broken === previous) break;
+      renderKatex(node, broken, lean);
+      previous = broken;
+    }
+  }
+}
+
+// Re-fit when the panel width changes (not its height, which our own rendering changes).
+let lastWidth = root.clientWidth;
+let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+new ResizeObserver(() => {
+  if (root.clientWidth === lastWidth) return;
+  lastWidth = root.clientWidth;
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(render, 100);
+}).observe(root);
 
 function renderState(state: PanelState): Node[] {
   switch (state.kind) {
