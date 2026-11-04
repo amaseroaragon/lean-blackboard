@@ -25,6 +25,23 @@
         "command": "leanBlackboard.dumpGoals",
         "title": "Dump Goals",
         "category": "Lean Blackboard"
+      },
+      {
+        "command": "leanBlackboard.showLean",
+        "title": "Show Lean Syntax",
+        "category": "Lean Blackboard",
+        "icon": "$(code)"
+      },
+      {
+        "command": "leanBlackboard.showMath",
+        "title": "Show Math Notation",
+        "category": "Lean Blackboard",
+        "icon": "$(symbol-operator)"
+      },
+      {
+        "command": "leanBlackboard.toggleNotation",
+        "title": "Toggle Math / Lean Notation",
+        "category": "Lean Blackboard"
       }
     ],
     "viewsContainers": {
@@ -44,6 +61,93 @@
           "name": "Goals"
         }
       ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "leanBlackboard.showLean",
+          "when": "view == leanBlackboard.goals && leanBlackboard.notation != lean",
+          "group": "navigation"
+        },
+        {
+          "command": "leanBlackboard.showMath",
+          "when": "view == leanBlackboard.goals && leanBlackboard.notation == lean",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "leanBlackboard.showLean",
+          "when": "leanBlackboard.notation != lean"
+        },
+        {
+          "command": "leanBlackboard.showMath",
+          "when": "leanBlackboard.notation == lean"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Lean Blackboard",
+      "properties": {
+        "leanBlackboard.customRules": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "Extra or overriding LaTeX rules. Templates use `#1`, `#2`… for operands; `{#1}` drops Lean-only parentheses. Example: `{\"functions\": {\"Real.sinh\": \"\\\\sinh #1\"}, \"symbols\": {\"G\": \"\\\\mathcal{G}\"}, \"infix\": {\"→\": \"#1 \\\\Rightarrow #2\"}}`. Only operators the parser already knows can be re-rendered.",
+          "properties": {
+            "symbols": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Identifier → LaTeX (no placeholders)."
+            },
+            "functions": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Fully qualified function → template with #1, #2…"
+            },
+            "infix": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Infix operator → template with #1 and #2."
+            },
+            "prefix": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Prefix operator → template with #1."
+            },
+            "postfix": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Postfix operator → template with #1."
+            },
+            "binders": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Binder (∀ ∃ ∃! ∑ ∏) → LaTeX command."
+            }
+          },
+          "additionalProperties": false
+        },
+        "leanBlackboard.macros": {
+          "type": "object",
+          "default": {},
+          "additionalProperties": {
+            "type": "string"
+          },
+          "markdownDescription": "KaTeX macros (equivalent to `\\newcommand`), usable in custom rules. Example: `{\"\\\\R\": \"\\\\mathbb{R}\", \"\\\\abs\": \"\\\\left|#1\\\\right|\"}`."
+        }
+      }
     }
   },
   "scripts": {

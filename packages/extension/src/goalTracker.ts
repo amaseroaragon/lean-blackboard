@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import { interactiveGoalsToView, plainGoalToView } from '@lean-blackboard/core';
 import { CancelledError, LeanBridge, Position, describeError, ms } from './leanBridge';
 import type { GoalsPanel } from './panel';
+import type { Settings } from './settings';
 
 const DEBOUNCE_MS = 150;
 const MAX_JSON_CHARS = 8000;
@@ -19,6 +20,7 @@ export class GoalTracker implements vscode.Disposable {
   constructor(
     private readonly bridge: LeanBridge,
     private readonly panel: GoalsPanel,
+    private readonly settings: Settings,
     private readonly log: vscode.LogOutputChannel,
   ) {
     const active = vscode.window.activeTextEditor;
@@ -50,6 +52,7 @@ export class GoalTracker implements vscode.Disposable {
         }
       }),
       this.bridge.onDidChangeState(() => this.schedule()),
+      this.settings.onDidChangeRules(() => this.schedule()),
       this.panel.onDidChangeVisibility((visible) => {
         if (visible) this.schedule();
       }),
@@ -92,7 +95,7 @@ export class GoalTracker implements vscode.Disposable {
       const res = await this.bridge.interactiveGoals(doc.uri, position, token);
       if (token.isCancellationRequested) return;
       this.log.debug(`getInteractiveGoals ${location} (${ms(t0)})`);
-      this.panel.setState({ kind: 'goals', location, goals: interactiveGoalsToView(res) });
+      this.panel.setState({ kind: 'goals', location, goals: interactiveGoalsToView(res, this.settings.rules) });
       return;
     } catch (e) {
       if (e instanceof CancelledError || token.isCancellationRequested) return;

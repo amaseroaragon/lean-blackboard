@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import * as vscode from 'vscode';
 import type { HostMessage, PanelState, WebviewMessage } from '@lean-blackboard/core';
+import type { Settings } from './settings';
 
 export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewType = 'leanBlackboard.goals';
@@ -12,11 +13,17 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
   private ready = false;
   private state: PanelState = { kind: 'waiting' };
   private readonly visibilityEmitter = new vscode.EventEmitter<boolean>();
+  private readonly disposables: vscode.Disposable[] = [];
 
   /** Fires when the panel becomes visible or hidden. */
   readonly onDidChangeVisibility = this.visibilityEmitter.event;
 
-  constructor(private readonly extensionUri: vscode.Uri) {}
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly settings: Settings,
+  ) {
+    this.disposables.push(settings.onDidChangeView(() => this.postConfig()));
+  }
 
   get visible(): boolean {
     return this.view?.visible ?? false;
@@ -36,9 +43,17 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
     };
     webview.onDidReceiveMessage((m: WebviewMessage) => {
-      if (m.type === 'ready') {
-        this.ready = true;
-        this.post();
+      switch (m.type) {
+        case 'ready':
+          this.ready = true;
+          this.postConfig();
+          this.post();
+          break;
+        case 'copy':
+          void vscode.env.clipboard.writeText(m.text).then(() => {
+            vscode.window.setStatusBarMessage('Lean Blackboard: LaTeX copied', 2000);
+          });
+          break;
       }
     });
     view.onDidChangeVisibility(() => {
@@ -56,8 +71,15 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
   }
 
   private post(): void {
+    this.send({ type: 'state', state: this.state });
+  }
+
+  private postConfig(): void {
+    this.send({ type: 'config', config: this.settings.view });
+  }
+
+  private send(msg: HostMessage): void {
     if (!this.view || !this.ready) return;
-    const msg: HostMessage = { type: 'state', state: this.state };
     void this.view.webview.postMessage(msg);
   }
 
@@ -91,5 +113,6 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
 
   dispose(): void {
     this.visibilityEmitter.dispose();
+    for (const d of this.disposables) d.dispose();
   }
 }

@@ -59,14 +59,53 @@ pre {
   font-style: italic;
 }
 
-.math {
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
   padding: 2px 0;
+}
+
+.row .content {
+  flex: 1;
+  min-width: 0;
   /* KaTeX does not wrap long formulas everywhere; scroll instead of overflowing. */
   overflow-x: auto;
   overflow-y: hidden;
 }
 
-.math .katex {
+.row .actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+}
+
+.row:hover .actions,
+.row:focus-within .actions {
+  opacity: 1;
+}
+
+.action {
+  padding: 0 4px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--vscode-textLink-foreground);
+  font-family: var(--vscode-font-family);
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.action:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+}
+
+.content .katex {
   font-size: 1.1em;
   color: var(--vscode-foreground);
 }

@@ -2,15 +2,48 @@
 // KaTeX's `render` builds DOM nodes with CSSOM styles, so it works under a strict CSP without
 // `'unsafe-inline'`.
 
-import type { GoalView, HostMessage, HypView, PanelState, WebviewMessage } from '@lean-blackboard/core';
+import type {
+  GoalView,
+  HostMessage,
+  HypView,
+  Notation,
+  PanelState,
+  ViewConfig,
+  WebviewMessage,
+} from '@lean-blackboard/core';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import './panel.css';
 
-declare function acquireVsCodeApi(): { postMessage(msg: WebviewMessage): void };
+/** Persisted across hide/show of the view (the webview is recreated). */
+interface SavedState {
+  /** Notation the overrides were made against: they are dropped when the global one changes. */
+  notation?: Notation;
+  /** Per-row notation that differs from the global one, keyed by row id. */
+  overrides?: Record<string, Notation>;
+}
+
+declare function acquireVsCodeApi(): {
+  postMessage(msg: WebviewMessage): void;
+  getState(): SavedState | undefined;
+  setState(state: SavedState): void;
+};
 
 const vscode = acquireVsCodeApi();
 const root = document.getElementById('root') as HTMLElement;
+
+let panelState: PanelState = { kind: 'waiting' };
+let config: ViewConfig = { notation: 'math', macros: {} };
+const saved = vscode.getState() ?? {};
+let overrides: Record<string, Notation> = saved.overrides ?? {};
+
+/** One displayable formula: a hypothesis or a goal target. */
+interface Row {
+  key: string;
+  latex: string;
+  lean: string;
+  className: string;
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -27,31 +60,73 @@ function message(text: string, className = 'message'): HTMLElement {
   return el('p', className, text);
 }
 
+function button(label: string, title: string, onClick: () => void): HTMLButtonElement {
+  const b = el('button', 'action', label);
+  b.type = 'button';
+  b.title = title;
+  b.setAttribute('aria-label', title);
+  b.addEventListener('click', onClick);
+  return b;
+}
+
 /**
- * Renders LaTeX into a block. If KaTeX rejects it (a conversion bug), shows the Lean text
- * instead, so the panel is never empty. The Lean text is also available as a tooltip.
+ * Renders LaTeX. If KaTeX rejects it (a conversion bug or a bad user rule/macro), shows the
+ * Lean text instead, so the panel is never empty.
  */
-function math(latex: string, leanText: string, className: string): HTMLElement {
-  const node = el('div', `math ${className}`);
-  node.title = leanText;
+function renderMath(target: HTMLElement, latex: string, lean: string): void {
   try {
-    katex.render(`\\displaystyle ${latex}`, node, {
+    katex.render(`\\displaystyle ${latex}`, target, {
       throwOnError: true,
       displayMode: false,
       strict: 'ignore',
       trust: false,
       maxExpand: 1000,
       maxSize: 20,
+      // KaTeX may mutate the object (\gdef): give it a copy.
+      macros: { ...config.macros },
     });
+    target.title = lean;
   } catch (e) {
-    node.replaceChildren(el('span', 'code fallback', leanText));
-    node.title = `KaTeX could not render: ${e instanceof Error ? e.message : String(e)}`;
+    target.replaceChildren(el('span', 'code fallback', lean));
+    target.title = `KaTeX could not render: ${e instanceof Error ? e.message : String(e)}`;
   }
-  return node;
 }
 
-function render(state: PanelState): void {
-  root.replaceChildren(...renderState(state));
+function notationOf(key: string): Notation {
+  return overrides[key] ?? config.notation;
+}
+
+function toggleRow(key: string): void {
+  const flipped: Notation = notationOf(key) === 'math' ? 'lean' : 'math';
+  if (flipped === config.notation) delete overrides[key];
+  else overrides[key] = flipped;
+  persist();
+  render();
+}
+
+function persist(): void {
+  vscode.setState({ notation: config.notation, overrides });
+}
+
+function renderRow(row: Row): HTMLElement {
+  const notation = notationOf(row.key);
+  const content = el('div', 'content');
+  if (notation === 'math') renderMath(content, row.latex, row.lean);
+  else content.append(el('span', 'code', row.lean));
+
+  const actions = el(
+    'div',
+    'actions',
+    button(notation === 'math' ? 'Lean' : 'Math', notation === 'math' ? 'Show Lean syntax' : 'Show math notation', () =>
+      toggleRow(row.key),
+    ),
+    button('Copy', 'Copy LaTeX', () => vscode.postMessage({ type: 'copy', text: row.latex })),
+  );
+  return el('div', `row ${row.className}`, content, actions);
+}
+
+function render(): void {
+  root.replaceChildren(...renderState(panelState));
 }
 
 function renderState(state: PanelState): Node[] {
@@ -87,25 +162,37 @@ function location(text: string): HTMLElement {
   return el('div', 'location', text);
 }
 
-function renderGoal(goal: GoalView): HTMLElement {
+function renderGoal(goal: GoalView, index: number): HTMLElement {
   if (goal.kind === 'plain') return el('section', 'goal', el('pre', 'code', goal.text));
 
   const section = el('section', diffClass('goal', goal.isInserted, goal.isRemoved));
   if (goal.userName) section.append(el('div', 'case', `case ${goal.userName}`));
-  section.append(...goal.hyps.map(renderHyp));
+  section.append(...goal.hyps.map((h) => renderRow(hypRow(h, index))));
   const prefix = goal.prefix.trim() === '⊢' ? '\\vdash' : `\\texttt{${goal.prefix.trim()}}`;
-  section.append(math(`${prefix} ${goal.typeLatex}`, `${goal.prefix}${goal.type}`, 'target'));
+  section.append(
+    renderRow({
+      key: `g${index}:goal`,
+      latex: `${prefix} ${goal.typeLatex}`,
+      lean: `${goal.prefix}${goal.type}`,
+      className: 'target',
+    }),
+  );
   return section;
 }
 
-function renderHyp(h: HypView): HTMLElement {
+function hypRow(h: HypView, goalIndex: number): Row {
   let latex = `${h.namesLatex} : ${h.typeLatex}`;
   let lean = `${h.names.join(' ')} : ${h.type}`;
   if (h.val !== undefined && h.valLatex !== undefined) {
     latex += ` \\coloneqq ${h.valLatex}`;
     lean += ` := ${h.val}`;
   }
-  return math(latex, lean, diffClass('hyp', h.isInserted, h.isRemoved));
+  return {
+    key: `g${goalIndex}:hyp:${h.names.join(' ')}`,
+    latex,
+    lean,
+    className: diffClass('hyp', h.isInserted, h.isRemoved),
+  };
 }
 
 function diffClass(base: string, inserted: boolean, removed: boolean): string {
@@ -113,8 +200,20 @@ function diffClass(base: string, inserted: boolean, removed: boolean): string {
 }
 
 window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
-  if (e.data?.type === 'state') render(e.data.state);
+  const msg = e.data;
+  if (msg?.type === 'state') {
+    panelState = msg.state;
+  } else if (msg?.type === 'config') {
+    // A new global notation resets the per-row choices.
+    if (saved.notation !== undefined && saved.notation !== msg.config.notation) overrides = {};
+    saved.notation = msg.config.notation;
+    config = msg.config;
+    persist();
+  } else {
+    return;
+  }
+  render();
 });
 
-render({ kind: 'waiting' });
+render();
 vscode.postMessage({ type: 'ready' });
