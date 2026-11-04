@@ -155,7 +155,16 @@ function renderRow(row: Row): HTMLElement {
 const MAX_BREAK_DEPTH = 3;
 
 function render(): void {
-  root.replaceChildren(...renderPins(), ...renderState(panelState));
+  let nodes: Node[];
+  try {
+    nodes = [...renderPins(), ...renderState(panelState)];
+  } catch (e) {
+    // Never keep showing a stale state silently: say that this one could not be drawn.
+    console.error(e);
+    const detail = e instanceof Error ? e.message : String(e);
+    nodes = [message(`Lean Blackboard could not draw this state (${detail}). Please report it.`, 'message error')];
+  }
+  root.replaceChildren(...nodes);
   fitFormulas();
 }
 
@@ -239,10 +248,13 @@ function renderGoalsBody(state: GoalsState, keyPrefix: string): Node[] {
     nodes.push(...state.goals.map((g, i) => renderGoal(g, `${keyPrefix}g${i}`)));
   }
   // The expected type often repeats the only goal (e.g. `exact` on the main goal): skip it then.
-  const repeatsGoal = state.goals?.length === 1 && goalsSignature([state.termGoal!]) === goalsSignature(state.goals);
-  if (state.termGoal && !repeatsGoal) {
+  const termGoal = state.termGoal;
+  const repeatsGoal =
+    termGoal !== undefined && termGoal !== null && state.goals?.length === 1 &&
+    goalsSignature([termGoal]) === goalsSignature(state.goals);
+  if (termGoal && !repeatsGoal) {
     nodes.push(el('h2', 'count', 'Expected type'));
-    nodes.push(renderGoal(state.termGoal, `${keyPrefix}term`));
+    nodes.push(renderGoal(termGoal, `${keyPrefix}term`));
   }
   return nodes;
 }
