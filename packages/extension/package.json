@@ -179,8 +179,8 @@
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
     "package": "vsce package --no-dependencies --skip-license --allow-missing-repository -o ../../lean-blackboard.vsix",
-    "build:test": "node esbuild.test.mjs",
-    "test:integration": "node esbuild.test.mjs && node dist-test/runTest.js"
+    "build:test": "node esbuild.integration.mjs",
+    "test:integration": "node esbuild.integration.mjs && node dist-test/runTest.js"
   },
   "devDependencies": {
     "@types/vscode": "~1.90.0",
