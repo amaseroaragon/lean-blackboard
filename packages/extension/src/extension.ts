@@ -1,3 +1,4 @@
+import { goalsToLatexDocument } from '@lean-blackboard/core';
 import * as vscode from 'vscode';
 import { GoalTracker } from './goalTracker';
 import { LeanBridge } from './leanBridge';
@@ -21,6 +22,15 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('leanBlackboard.dumpGoals', () => tracker.dumpActive()),
     vscode.commands.registerCommand('leanBlackboard.showLean', () => settings.setNotation('lean')),
     vscode.commands.registerCommand('leanBlackboard.showMath', () => settings.setNotation('math')),
+    vscode.commands.registerCommand('leanBlackboard.copyGoalState', async () => {
+      const state = panel.currentState;
+      if (state.kind !== 'goals') {
+        void vscode.window.showInformationMessage('Lean Blackboard: no goals to copy.');
+        return;
+      }
+      await vscode.env.clipboard.writeText(goalsToLatexDocument(state.goals, state.termGoal));
+      vscode.window.setStatusBarMessage('Lean Blackboard: goal state copied as LaTeX', 2000);
+    }),
     vscode.commands.registerCommand('leanBlackboard.toggleNotation', () =>
       settings.setNotation(settings.view.notation === 'math' ? 'lean' : 'math'),
     ),

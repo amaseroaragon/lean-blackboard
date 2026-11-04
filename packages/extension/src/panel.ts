@@ -25,6 +25,11 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
     this.disposables.push(settings.onDidChangeView(() => this.postConfig()));
   }
 
+  /** What the panel currently shows (for commands such as "copy goal state"). */
+  get currentState(): PanelState {
+    return this.state;
+  }
+
   get visible(): boolean {
     return this.view?.visible ?? false;
   }

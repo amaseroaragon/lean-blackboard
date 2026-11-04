@@ -11,6 +11,7 @@ import type {
   ViewConfig,
   WebviewMessage,
 } from '@lean-blackboard/core';
+import { goalsToLatexDocument } from '@lean-blackboard/core';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import './panel.css';
@@ -155,7 +156,10 @@ function renderState(state: PanelState): Node[] {
         nodes.push(message('No goals.', 'message success'));
       } else {
         const n = state.goals.length;
-        nodes.push(el('h2', 'count', n === 1 ? '1 goal' : `${n} goals`));
+        const copyAll = button('Copy all', 'Copy all goals as LaTeX', () =>
+          vscode.postMessage({ type: 'copy', text: goalsToLatexDocument(state.goals, state.termGoal) }),
+        );
+        nodes.push(el('div', 'heading', el('h2', 'count', n === 1 ? '1 goal' : `${n} goals`), copyAll));
         nodes.push(...state.goals.map((g, i) => renderGoal(g, `g${i}`)));
       }
       if (state.termGoal) {

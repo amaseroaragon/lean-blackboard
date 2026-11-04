@@ -42,6 +42,12 @@
         "command": "leanBlackboard.toggleNotation",
         "title": "Toggle Math / Lean Notation",
         "category": "Lean Blackboard"
+      },
+      {
+        "command": "leanBlackboard.copyGoalState",
+        "title": "Copy Goal State as LaTeX",
+        "category": "Lean Blackboard",
+        "icon": "$(copy)"
       }
     ],
     "viewsContainers": {
@@ -73,6 +79,11 @@
           "command": "leanBlackboard.showMath",
           "when": "view == leanBlackboard.goals && leanBlackboard.notation == lean",
           "group": "navigation"
+        },
+        {
+          "command": "leanBlackboard.copyGoalState",
+          "when": "view == leanBlackboard.goals",
+          "group": "navigation@2"
         }
       ],
       "commandPalette": [

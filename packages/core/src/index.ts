@@ -23,3 +23,4 @@ export {
   rulesToWire,
 } from './precise';
 export type { PreciseView, WireRules } from './precise';
+export { goalToLatexArray, goalsToLatexDocument } from './export';
