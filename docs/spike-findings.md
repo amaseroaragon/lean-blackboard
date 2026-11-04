@@ -107,7 +107,7 @@ Completar tras probar en el Extension Development Host:
 - [ ] Comportamiento tras `Lean 4: Restart Server` y `Lean 4: Restart File`.
 - [ ] Ventana sin ficheros Lean: sin errores.
 
-## Correcciones propuestas a CLAUDE.md
+## Correcciones a CLAUDE.md (aplicadas)
 
 1. El código de "needs reconnect" es **`-32900`** (`"Outdated RPC session"`); añadir que
    `-32901`/`-32902` también invalidan la sesión.

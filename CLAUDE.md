@@ -57,8 +57,9 @@ Principios:
 
 ## API de la extensión oficial (verificado leyendo el código, 2026-11-04)
 
-Verificado sobre `leanprover/vscode-lean4` v0.0.241 y `leanprover/lean4` master. **No probado
-todavía en ejecución**: confirmarlo es el objetivo de la Fase 0.
+Verificado sobre `leanprover/vscode-lean4` v0.0.241 y `leanprover/lean4` master, y de nuevo sobre
+v0.0.240 (la instalada) y Lean v4.34.1: la API que usamos es idéntica. Detalles y respuestas reales
+en `docs/spike-findings.md`.
 
 **Acceso**
 - `vscode.extensions.getExtension('leanprover.lean4')`. Si no está activa, `await ext.activate()`.
@@ -77,13 +78,18 @@ todavía en ejecución**: confirmarlo es el objetivo de la Fase 0.
 - Eventos: `clientAdded`, `clientRemoved`, `clientStopped`.
 - `findClient(uri)` exige un `ExtUri` interno que no podemos construir. **No usarlo**: usar
   `getActiveClient()` o `getClients()` comparando `getClientFolder()` nosotros.
+- `getClientFolder()` devuelve un `ExtUri`: `{ scheme: 'file', fsPath }` o
+  `{ scheme: 'untitled', path }` (cliente "ad hoc" para ficheros fuera de un proyecto Lake).
 
 **`LeanClient`**
 - `sendRequest(method, params, token?)` y `sendNotification(method, params)` sobre el proceso ya
-  existente. `sendRequest` rechaza con `'No connection to Lean'` si el cliente no está corriendo.
+  existente. `sendRequest` rechaza con el **string** `'No connection to Lean'` (no un `Error`) si el
+  cliente no está corriendo. Los errores del servidor llegan como `ResponseError` con `.code`.
 - `isRunning()`.
 - Eventos: `restarted`, `restartedWorker`, `stopped`, `didChange`, `didClose`. Tras un reinicio
   del servidor o del worker, las sesiones RPC dejan de valer y hay que reconectar.
+  - `restartedWorker` emite la URI del documento como string.
+  - `didClose` emite `{ textDocument: { uri } }`.
 - URIs: el cliente usa el conversor por defecto, así que basta con `document.uri.toString()`.
 
 **Peticiones al servidor** (documentadas en `lean4/src/Lean/Server/ProtocolOverview.lean`)
@@ -92,15 +98,21 @@ todavía en ejecución**: confirmarlo es el objetivo de la Fase 0.
   - Respuesta: `{ rendered: string, goals: string[] } | null`.
   - Lean lo marca como "no usado en VS Code". Lo usamos solo como comprobación y respaldo.
 - **Vía principal: RPC**
-  1. `$/lean/rpc/connect` con `{ uri }`. Devuelve `{ sessionId }`.
+  1. `$/lean/rpc/connect` con `{ uri }`. Devuelve `{ sessionId }`. **`sessionId` es un string**
+     (UInt64 en decimal) y se envía tal cual; como número el servidor responde `-32602`.
   2. `$/lean/rpc/call` con `{ sessionId, method, params, textDocument: { uri }, position }`.
   3. `method = 'Lean.Widget.getInteractiveGoals'`, `params = { textDocument: { uri }, position }`.
      Respuesta: `{ goals: InteractiveGoal[] } | null`.
   - `$/lean/rpc/keepAlive` con `{ uri, sessionId }` **cada 10 s**: el servidor caduca la sesión a
     los 30 s. Parar el intervalo al cerrar el documento o al hacer dispose.
   - El servidor admite varias sesiones por fichero, así que la nuestra convive con la de la InfoView.
-  - Si una llamada falla por sesión obsoleta (código de error "needs reconnect"; verificar el código
-    exacto en el fuente de Lean), reconectar y reintentar una vez.
+  - Si una llamada falla con **`-32900`** (`RpcNeedsReconnect`, mensaje `"Outdated RPC session"`),
+    reconectar y reintentar una vez. `-32901` (`WorkerExited`) y `-32902` (`WorkerCrashed`) también
+    invalidan la sesión. `-32800`/`-32801` (cancelada / contenido modificado) se ignoran.
+  - **Liberar las referencias RPC** de cada respuesta con `$/lean/rpc/release`
+    `{ uri, sessionId, refs }`; si no, el servidor las guarda hasta que caduca la sesión. El cliente
+    oficial negocia el wire format `v1`, así que las refs son `{"__rpcref": "N"}` (en `v0`,
+    `{"p": "N"}`).
 - Tipos (`InteractiveGoal`, `InteractiveHypothesisBundle`, `CodeWithInfos`, `TaggedText`): ver
   `lean4-infoview-api/src/rpcApi.ts`. Se puede usar `@leanprover/infoview-api` como dependencia
   solo de tipos, comprobando antes la versión publicada en npm.
