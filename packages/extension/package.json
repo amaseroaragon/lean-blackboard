@@ -2,7 +2,7 @@
   "name": "lean-blackboard",
   "displayName": "Lean Blackboard",
   "description": "Shows Lean 4 hypotheses and goals with rendered math notation.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "publisher": "amaseroaragon",
   "license": "UNLICENSED",
