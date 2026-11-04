@@ -20,6 +20,17 @@
   nivel superior (cuantificadores, ⇒, ∨, ∧, relaciones, +). Se recalcula al cambiar el ancho.
 - **Interactividad (solo modo preciso)**: al pasar el ratón por una subexpresión se resalta y
   aparece su tipo; Ctrl+clic (⌘+clic en macOS) abre su definición.
+- **Before / After**: con el cursor después de la primera táctica de una línea, la sección
+  plegable *Before* muestra cómo estaba la prueba al principio de esa línea (antes del paso), y
+  debajo el estado actual. Se oculta si no cambia nada. En modo preciso se resalta la
+  subexpresión que cambia: en rojo en *Before* (lo que va a cambiar) y en verde en el estado
+  actual (lo nuevo). Las hipótesis nuevas o eliminadas se resaltan en los dos modos.
+- **Mensajes**: errores, avisos e infos de la línea del cursor, con las expresiones en notación
+  matemática (en modo preciso, dibujadas desde el `Expr` real) y los objetivos incrustados (por
+  ejemplo, *unsolved goals*) como objetivos. Clic en la cabecera de un mensaje para ir a su línea.
+- **Fijar un estado**: botón `Pin` junto a la posición, o el icono 📌 de la barra del panel
+  (comando `Lean Blackboard: Pin Goal State`). El estado fijado se queda arriba mientras te mueves
+  por la prueba (máximo 5; `Unpin` para quitarlo). Se conserva al ocultar el panel.
 
 ## Reglas propias: `leanBlackboard.customRules`
 

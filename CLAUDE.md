@@ -178,6 +178,8 @@ envían en cada petición y se aplican también aquí. Detalles de uso en `docs/
 `.vsix` local, objetivos en modo término, Mathlib (proyecto de ejemplo, reglas y golden reales),
 tests de integración + CI + ESLint, partición de fórmulas largas, exportar el estado completo como
 LaTeX e interactividad en modo preciso (tipo al pasar el ratón, Ctrl/Cmd+clic a la definición).
+Después: sección *Before* (objetivos al principio de la línea) con resaltado de cambios, mensajes
+de error/aviso con notación matemática y estados fijados. Protocolo del paquete Lean: versión 4.
 Ver `docs/`.
 
 ## Comandos
