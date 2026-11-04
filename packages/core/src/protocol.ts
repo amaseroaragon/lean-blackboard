@@ -47,5 +47,19 @@ export type PanelState =
     }
   | { kind: 'error'; location: string; message: string };
 
-export type HostMessage = { type: 'state'; state: PanelState };
-export type WebviewMessage = { type: 'ready' };
+export type Notation = 'math' | 'lean';
+
+/** Display settings, sent separately from the goals so they apply without a new request. */
+export interface ViewConfig {
+  /** Global notation. Per-row overrides live in the webview and reset when this changes. */
+  notation: Notation;
+  /** KaTeX macros (`leanBlackboard.macros`), e.g. `{ "\\R": "\\mathbb{R}" }`. */
+  macros: Record<string, string>;
+}
+
+export type HostMessage = { type: 'state'; state: PanelState } | { type: 'config'; config: ViewConfig };
+
+export type WebviewMessage =
+  | { type: 'ready' }
+  /** Copy text to the clipboard (done by the host: more reliable than the webview clipboard). */
+  | { type: 'copy'; text: string };
