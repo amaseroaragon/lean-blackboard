@@ -1,0 +1,9 @@
+name = "LeanBlackboard"
+defaultTargets = ["LeanBlackboard"]
+
+[[lean_lib]]
+name = "LeanBlackboard"
+
+# Golden tests for the printer: `lake build LeanBlackboardTest`.
+[[lean_lib]]
+name = "LeanBlackboardTest"

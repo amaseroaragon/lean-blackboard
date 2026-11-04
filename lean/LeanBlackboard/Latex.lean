@@ -1,0 +1,396 @@
+import Lean
+import LeanBlackboard.Name
+
+/-!
+# `Expr` → LaTeX
+
+A small, type-aware printer. It covers what the extension's text-based fast mode cannot know:
+
+* `p → q` between propositions is `\Rightarrow`; between types it is `\to`.
+* `a / b` is `\frac` in fields, `\lfloor a/b \rfloor` in `ℕ` and `\operatorname{div}` in `ℤ`.
+* Bounded quantifiers (`∀ x, x > 0 → p`, `∃ x, x > 0 ∧ p`) print as `∀ x > 0, p`.
+* Coercions (`@[coe]` functions) are invisible; implicit and instance arguments are hidden.
+
+Function and symbol rules come from the client (default + user rules), with the same template
+syntax as the fast mode: `#n` is an operand (parenthesised if needed), `{#n}` an operand in a
+group slot (never parenthesised).
+
+Anything unsupported falls back to `\texttt{<pretty-printed Lean>}` for that subterm only.
+-/
+
+namespace LeanBlackboard
+
+open Lean Meta
+
+def maxPrec : Nat := 1024
+def argPrec : Nat := 1023
+
+/-- Rendered LaTeX with the precedence of its outermost construct. -/
+structure Tex where
+  s : String
+  prec : Nat := maxPrec
+  /-- A negation `-a`: parenthesised when it is a right operand. -/
+  isNeg : Bool := false
+  deriving Inhabited
+
+def Tex.paren (t : Tex) (p : Nat) : String :=
+  if t.prec < p then s!"\\left({t.s}\\right)" else t.s
+
+structure FunctionRule where
+  name : String
+  arity : Nat
+  template : String
+  deriving FromJson, ToJson, Inhabited
+
+structure SymbolRule where
+  name : String
+  latex : String
+  deriving FromJson, ToJson, Inhabited
+
+structure Rules where
+  symbols : Array SymbolRule := #[]
+  functions : Array FunctionRule := #[]
+  deriving FromJson, ToJson, Inhabited
+
+structure Ctx where
+  symbols : Std.HashMap String String := {}
+  functions : Std.HashMap String FunctionRule := {}
+
+def Ctx.ofRules (r : Rules) : Ctx where
+  symbols := r.symbols.foldl (fun m s => m.insert s.name s.latex) {}
+  functions := r.functions.foldl (fun m f => m.insert f.name f) {}
+
+abbrev LatexM := ReaderT Ctx MetaM
+
+/-- Fills `#n` / `{#n}` placeholders (see module doc). -/
+def fillTemplate (template : String) (args : Array Tex) : String := Id.run do
+  let cs := template.toList.toArray
+  let mut out := ""
+  let mut i := 0
+  while i < cs.size do
+    let c := cs[i]!
+    let digit (j : Nat) : Option Nat :=
+      if h : j < cs.size then
+        let d := cs[j]
+        if d.isDigit then some (d.toNat - '0'.toNat) else none
+      else none
+    -- Group slot `{#n}`.
+    if c == '{' && cs[i+1]? == some '#' && cs[i+3]? == some '}' then
+      if let some n := digit (i+2) then
+        if h : 0 < n ∧ n ≤ args.size then
+          out := out ++ "{" ++ args[n-1].s ++ "}"
+          i := i + 4
+          continue
+    if c == '#' then
+      if let some n := digit (i+1) then
+        if h : 0 < n ∧ n ≤ args.size then
+          out := out ++ args[n-1].paren maxPrec
+          i := i + 2
+          continue
+    out := out.push c
+    i := i + 1
+  return out
+
+def atom (s : String) : Tex := { s }
+
+/-- Casts that core Lean does not tag `@[coe]` (Mathlib does), but `↑` prints anyway. -/
+def knownCasts : List Name :=
+  [``Nat.cast, ``NatCast.natCast, `Int.cast, `IntCast.intCast, `Rat.cast, `RatCast.ratCast]
+
+/-- `[a, b]` from `a :: b :: []`. -/
+partial def listLiteral? (e : Expr) : Option (Array Expr) :=
+  match e.getAppFn, e.getAppArgs with
+  | .const ``List.nil _, #[_] => some #[]
+  | .const ``List.cons _, #[_, h, t] => (listLiteral? t).map (#[h] ++ ·)
+  | _, _ => none
+
+/-- Constants the printer knows without client rules (client `symbols` take precedence). -/
+def builtinSymbols : List (Name × String) :=
+  [(``Nat, "\\mathbb{N}"), (``Int, "\\mathbb{Z}"), (`Rat, "\\mathbb{Q}"), (`Real, "\\mathbb{R}"),
+   (`Complex, "\\mathbb{C}"), (``True, "\\mathrm{True}"), (``False, "\\mathrm{False}"),
+   (`Real.pi, "\\pi")]
+
+/-- Number sets and `Set`/`Finset`/`Fin`: binders over them read `x \in T`. -/
+def isSetLike (t : Expr) : Bool :=
+  match t.getAppFn with
+  | .const c _ =>
+    if t.getAppNumArgs == 0 then [``Nat, ``Int, `Rat, `Real, `Complex].contains c
+    else [`Set, `Finset, ``Fin].contains c
+  | _ => false
+
+/-- Explicit arguments of an application, using the function's binder infos. -/
+def explicitArgs (f : Expr) (args : Array Expr) : MetaM (Array Expr) := do
+  let info ← getFunInfoNArgs f args.size
+  let mut out := #[]
+  for h : i in [0:args.size] do
+    let explicit := match info.paramInfo[i]? with
+      | some p => p.binderInfo.isExplicit
+      | none => true
+    if explicit then out := out.push args[i]
+  return out
+
+private def fvarLatex (id : FVarId) : MetaM String := do
+  let n := (← id.getDecl).userName
+  return identToLatex (n.eraseMacroScopes.toString (escape := false)) (inaccessible := n.hasMacroScopes)
+
+/-- Relations allowed as binder predicates, with their LaTeX. -/
+private def relation? (e : Expr) : Option (String × Expr × Expr) :=
+  match e.getAppFn, e.getAppArgs with
+  | .const ``LT.lt _, #[_, _, a, b] => some ("<", a, b)
+  | .const ``LE.le _, #[_, _, a, b] => some ("\\leq", a, b)
+  | .const ``GT.gt _, #[_, _, a, b] => some (">", a, b)
+  | .const ``GE.ge _, #[_, _, a, b] => some ("\\geq", a, b)
+  | .const ``Ne _, #[_, a, b] => some ("\\neq", a, b)
+  | .const ``Membership.mem _, #[_, _, _, s, a] => some ("\\in", a, s)
+  | .const ``HasSubset.Subset _, #[_, _, a, b] => some ("\\subseteq", a, b)
+  | _, _ => none
+
+/-- `x ∈ s` / `x > 0` where the left side is exactly `x`. -/
+private def binderPred? (x : Expr) (e : Expr) : Option (String × Expr) :=
+  match relation? e with
+  | some (op, a, b) => if a == x && !b.containsFVar x.fvarId! then some (op, b) else none
+  | none => none
+
+mutual
+
+partial def render (e : Expr) : LatexM Tex := do
+  try
+    renderCore e
+  catch _ =>
+    fallback e
+
+partial def fallback (e : Expr) : LatexM Tex := do
+  let fmt ← try ppExpr e catch _ => pure (format "?")
+  return atom (texttt (toString fmt))
+
+partial def renderCore (e : Expr) : LatexM Tex := do
+  match e with
+  | .mdata _ b => render b
+  | .fvar id => return atom (← fvarLatex id)
+  | .lit (.natVal n) => return atom (toString n)
+  | .lit (.strVal s) => return atom (texttt s.quote)
+  | .sort .zero => return atom "\\mathrm{Prop}"
+  | .sort (.succ .zero) => return atom "\\mathrm{Type}"
+  | .const c _ => return atom (constLatex (← read) c false)
+  | .forallE .. => renderForall e
+  | .lam .. => renderLam e
+  | .app .. => renderApp e
+  | _ => fallback e
+
+partial def constLatex (ctx : Ctx) (c : Name) (head : Bool) : String :=
+  let s := c.toString (escape := false)
+  match ctx.symbols.get? s with
+  | some l => l
+  | none => (builtinSymbols.lookup c).getD (identToLatex s (head := head))
+
+partial def binop (op : String) (p : Nat) (assoc : Ordering) (a b : Expr) : LatexM Tex := do
+  let la ← render a
+  let lb ← render b
+  -- `assoc`: `.lt` left, `.gt` right, `.eq` none.
+  let lp := if assoc == .lt then p else p + 1
+  let rp := if assoc == .gt then p else p + 1
+  let rhs := if lb.isNeg then s!"\\left({lb.s}\\right)" else lb.paren rp
+  return { s := s!"{la.paren lp} {op} {rhs}", prec := p }
+
+partial def renderApp (e : Expr) : LatexM Tex := do
+  let f := e.getAppFn
+  let args := e.getAppArgs
+  if let .const c _ := f then
+    if let some t ← renderKnown c args then return t
+    -- Coercions are invisible: show the coerced value.
+    if isCoeDecl (← getEnv) c || knownCasts.contains c then
+      if let some x := (← explicitArgs f args).back? then return ← render x
+    let explicit ← explicitArgs f args
+    if let some rule := (← read).functions.get? (c.toString (escape := false)) then
+      if rule.arity ≤ explicit.size then
+        let applied := fillTemplate rule.template (← explicit[:rule.arity].toArray.mapM render)
+        let rest := explicit[rule.arity:].toArray
+        if rest.isEmpty then return { s := applied, prec := argPrec }
+        return { s := applied ++ (← argList rest), prec := argPrec }
+    if explicit.isEmpty then return atom (constLatex (← read) c false)
+    return { s := constLatex (← read) c true ++ (← argList explicit), prec := maxPrec }
+  let explicit ← explicitArgs f args
+  let head ← render f
+  if explicit.isEmpty then return head
+  return { s := head.paren maxPrec ++ (← argList explicit), prec := maxPrec }
+
+partial def argList (args : Array Expr) : LatexM String := do
+  let parts ← args.mapM fun a => return (← render a).s
+  return s!"\\left({", ".intercalate parts.toList}\\right)"
+
+/-- Constants with dedicated notation. `none` means "not handled here". -/
+partial def renderKnown (c : Name) (args : Array Expr) : LatexM (Option Tex) := do
+  let n := args.size
+  if c == ``List.cons || c == ``List.nil then
+    if let some items := listLiteral? (mkAppN (.const c []) args) then
+      let parts ← items.mapM fun i => return (← render i).s
+      return some (atom s!"\\left[{", ".intercalate parts.toList}\\right]")
+  match c, n with
+  | ``Not, 1 =>
+    let a := args[0]!
+    if let some (op, x, y) := relation? a then
+      if op == "\\in" then return some (← binop "\\notin" 50 .eq x y)
+    match a.getAppFn, a.getAppArgs with
+    | .const ``Eq _, #[_, x, y] => return some (← binop "\\neq" 50 .eq x y)
+    | _, _ =>
+      let t ← render a
+      return some { s := s!"\\neg {t.paren maxPrec}", prec := maxPrec }
+  | ``And, 2 => some <$> binop "\\land" 35 .gt args[0]! args[1]!
+  | ``Or, 2 => some <$> binop "\\lor" 30 .gt args[0]! args[1]!
+  | ``Iff, 2 => some <$> binop "\\iff" 20 .eq args[0]! args[1]!
+  | ``Eq, 3 => some <$> binop "=" 50 .eq args[1]! args[2]!
+  | ``Ne, 3 => some <$> binop "\\neq" 50 .eq args[1]! args[2]!
+  | ``LT.lt, 4 => some <$> binop "<" 50 .eq args[2]! args[3]!
+  | ``LE.le, 4 => some <$> binop "\\leq" 50 .eq args[2]! args[3]!
+  | ``GT.gt, 4 => some <$> binop ">" 50 .eq args[2]! args[3]!
+  | ``GE.ge, 4 => some <$> binop "\\geq" 50 .eq args[2]! args[3]!
+  | ``Membership.mem, 5 => some <$> binop "\\in" 50 .eq args[4]! args[3]!
+  | ``HasSubset.Subset, 4 => some <$> binop "\\subseteq" 50 .eq args[2]! args[3]!
+  | ``HasSSubset.SSubset, 4 => some <$> binop "\\subset" 50 .eq args[2]! args[3]!
+  | ``Dvd.dvd, 4 => some <$> binop "\\mid" 50 .eq args[2]! args[3]!
+  | ``Union.union, 4 => some <$> binop "\\cup" 65 .lt args[2]! args[3]!
+  | ``Inter.inter, 4 => some <$> binop "\\cap" 70 .lt args[2]! args[3]!
+  | ``SDiff.sdiff, 4 => some <$> binop "\\setminus" 70 .eq args[2]! args[3]!
+  | ``HAdd.hAdd, 6 => some <$> binop "+" 65 .lt args[4]! args[5]!
+  | ``HSub.hSub, 6 => some <$> binop "-" 65 .lt args[4]! args[5]!
+  | ``HMul.hMul, 6 => some <$> binop "\\cdot" 70 .lt args[4]! args[5]!
+  | ``HSMul.hSMul, 6 => some <$> binop "\\cdot" 73 .gt args[4]! args[5]!
+  | ``HMod.hMod, 6 => some <$> binop "\\bmod" 70 .lt args[4]! args[5]!
+  | ``HAppend.hAppend, 6 => some <$> binop "\\mathbin{+\\!\\!+}" 65 .lt args[4]! args[5]!
+  | ``List.cons, 3 => some <$> binop "::" 67 .gt args[1]! args[2]!
+  | ``Function.comp, 5 => some <$> binop "\\circ" 90 .gt args[3]! args[4]!
+  | ``Prod, 2 => some <$> binop "\\times" 35 .gt args[0]! args[1]!
+  | ``HDiv.hDiv, 6 =>
+    let ty ← whnfR (← instantiateMVars args[2]!)
+    let a ← render args[4]!
+    let b ← render args[5]!
+    if ty.isConstOf ``Nat then
+      return some (atom s!"\\left\\lfloor \\frac\{{a.s}}\{{b.s}} \\right\\rfloor")
+    if ty.isConstOf ``Int then
+      return some (← binop "\\mathbin{\\operatorname{div}}" 70 .lt args[4]! args[5]!)
+    return some (atom s!"\\frac\{{a.s}}\{{b.s}}")
+  | ``HPow.hPow, 6 =>
+    let base ← render args[4]!
+    let exp ← render args[5]!
+    return some { s := s!"{base.paren maxPrec}^\{{exp.s}}", prec := 75 }
+  | ``Neg.neg, 3 =>
+    let a ← render args[2]!
+    return some { s := s!"-{a.paren 75}", prec := 75, isNeg := true }
+  | ``Inv.inv, 3 =>
+    let a ← render args[2]!
+    return some { s := s!"{a.paren maxPrec}^\{-1}", prec := argPrec }
+  | ``OfNat.ofNat, 3 => return some (← render args[1]!)
+  | ``Nat.succ, 1 =>
+    let a ← render args[0]!
+    return some { s := s!"{a.paren 65} + 1", prec := 65 }
+  | ``ite, 5 =>
+    let cond ← render args[1]!
+    let t ← render args[3]!
+    let f ← render args[4]!
+    return some (atom s!"\\begin\{cases} {t.s} & \\text\{if } {cond.s} \\\\ {f.s} & \\text\{otherwise} \\end\{cases}")
+  | ``Exists, 2 => renderExists args[1]!
+  | `Finset.sum, 5 => renderBigOp "\\sum" args[3]! args[4]!
+  | `Finset.prod, 5 => renderBigOp "\\prod" args[3]! args[4]!
+  | _, _ => return none
+
+/-- `∃ x, p x`, with bounded form `∃ x > 0, q` for `∃ x, x > 0 ∧ q`. -/
+partial def renderExists (p : Expr) : LatexM (Option Tex) := do
+  let .lam n t b bi := p | return none
+  withLocalDecl (binderName n) bi t fun x => do
+    let body := b.instantiate1 x
+    let name ← fvarLatex x.fvarId!
+    if let (.const ``And _, #[l, r]) := (body.getAppFn, body.getAppArgs) then
+      if let some (op, rhs) := binderPred? x l then
+        let rhsT ← render rhs
+        let rest ← render r
+        return some { s := s!"\\exists {name} {op} {rhsT.s},\\ {rest.s}", prec := 0 }
+    let tT ← render t
+    let rest ← render body
+    let ty := if isSetLike t then s!" \\in {tT.s}" else ""
+    return some { s := s!"\\exists {name}{ty},\\ {rest.s}", prec := 0 }
+
+/-- `∑ i ∈ s, f i`; `Finset.range n` prints as `\sum_{i=0}^{n-1}`. -/
+partial def renderBigOp (op : String) (s f : Expr) : LatexM (Option Tex) := do
+  let .lam n t b bi := f | return none
+  withLocalDecl (binderName n) bi t fun x => do
+    let name ← fvarLatex x.fvarId!
+    let body ← render (b.instantiate1 x)
+    let bodyS := body.paren 70
+    if let (.const `Finset.range _, #[m]) := (s.getAppFn, s.getAppArgs) then
+      let upper ← match m.getAppFn, m.getAppArgs with
+        | .const ``HAdd.hAdd _, #[_, _, _, _, k, one] =>
+          if (← render one).s == "1" then pure (← render k).s else pure s!"{(← render m).s} - 1"
+        | _, _ => pure s!"{(← render m).paren 66} - 1"
+      return some { s := s!"{op}_\{{name}=0}^\{{upper}} {bodyS}", prec := 67 }
+    let sT ← render s
+    return some { s := s!"{op}_\{{name} \\in {sT.s}} {bodyS}", prec := 67 }
+
+partial def renderLam (e : Expr) : LatexM Tex := do
+  lambdaTelescope e fun xs body => do
+    let names ← xs.mapM fun x => fvarLatex x.fvarId!
+    let b ← render body
+    let params := if names.size == 1 then names[0]! else s!"\\left({", ".intercalate names.toList}\\right)"
+    return { s := s!"{params} \\mapsto {b.s}", prec := 0 }
+
+partial def renderForall (e : Expr) : LatexM Tex := do
+  let .forallE n t b bi := e | fallback e
+  let isPropE ← isProp e
+  if bi.isInstImplicit then
+    -- Instance arguments are implicit in ordinary mathematics.
+    return ← withLocalDecl (binderName n) bi t fun x => render (b.instantiate1 x)
+  if !b.hasLooseBVars then
+    if isPropE && (← isProp t) then
+      return ← binop "\\Rightarrow" 25 .gt t b
+    return ← binop "\\to" 25 .gt t b
+  if !isPropE then
+    -- Dependent function type.
+    return ← withLocalDecl (binderName n) bi t fun x => do
+      let tT ← render t
+      let body ← render (b.instantiate1 x)
+      return { s := s!"\\left({← fvarLatex x.fvarId!} : {tT.s}\\right) \\to {body.paren 25}", prec := 25 }
+  withLocalDecl (binderName n) bi t fun x => do
+    let body := b.instantiate1 x
+    let name ← fvarLatex x.fvarId!
+    -- Bounded: `∀ x, x > 0 → p` is `∀ x > 0, p`.
+    if let .forallE _ prem concl _ := body then
+      if !concl.hasLooseBVars then
+        if let some (op, rhs) := binderPred? x prem then
+          let rhsT ← render rhs
+          let rest ← render concl
+          return { s := s!"\\forall {name} {op} {rhsT.s},\\ {rest.s}", prec := 0 }
+    -- Merge `∀ x, ∀ y, …` over the same type into `∀ x, y ∈ T, …`.
+    let tT ← render t
+    let ty := if isSetLike t then s!" \\in {tT.s}" else s!" : {tT.s}"
+    collectSameType t #[name] body fun names body => do
+      let rest ← render body
+      return { s := s!"\\forall {", ".intercalate names.toList}{ty},\\ {rest.s}", prec := 0 }
+
+/--
+Peels further dependent, explicit, unbounded `∀` binders whose type is exactly `t`, then calls
+`k` inside their scope (the new free variables only exist there).
+-/
+partial def collectSameType (t : Expr) (names : Array String) (body : Expr)
+    (k : Array String → Expr → LatexM Tex) : LatexM Tex := do
+  match body with
+  | .forallE n t' b bi =>
+    if t' == t && b.hasLooseBVars && !bi.isInstImplicit && (← isProp body) then
+      withLocalDecl (binderName n) bi t' fun y => do
+        let inner := b.instantiate1 y
+        -- Keep a bounded binder (`∀ y > 0, …`) separate.
+        if let .forallE _ prem concl _ := inner then
+          if !concl.hasLooseBVars && (binderPred? y prem).isSome then return ← k names body
+        collectSameType t (names.push (← fvarLatex y.fvarId!)) inner k
+    else k names body
+  | _ => k names body
+
+partial def binderName (n : Name) : Name :=
+  if n.isAnonymous || n == `_ then `x else n
+
+end
+
+/-- Renders `e` (in the current local context) as LaTeX. Never throws. -/
+def exprToLatex (e : Expr) (rules : Rules := {}) : MetaM String := do
+  let e ← instantiateMVars e
+  return (← (render e).run (Ctx.ofRules rules)).s
+
+end LeanBlackboard
