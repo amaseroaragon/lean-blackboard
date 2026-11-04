@@ -67,6 +67,12 @@ export class GoalTracker implements vscode.Disposable {
       this.bridge.onDidChangeState(() => this.schedule()),
       this.settings.onDidChangeRules(() => this.schedule()),
       vscode.workspace.onDidSaveTextDocument((doc) => this.noPrecise.delete(doc.uri.toString())),
+      // While Lean elaborates, goals at the cursor may be `null`; new diagnostics mean progress,
+      // so ask again (debounced, and cancelling the previous request).
+      vscode.languages.onDidChangeDiagnostics((e) => {
+        const uri = this.leanEditor?.document.uri.toString();
+        if (uri !== undefined && e.uris.some((u) => u.toString() === uri)) this.schedule();
+      }),
       this.panel.onDidChangeVisibility((visible) => {
         if (visible) this.schedule();
       }),
