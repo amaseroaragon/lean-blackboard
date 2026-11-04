@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # TypeScript: types, lint, unit + golden tests, bundles and the .vsix.
+  node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lean-blackboard-vsix
+          path: lean-blackboard.vsix
+
+  # Lean companion package: build and printer golden tests.
+  lean:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - run: lake build LeanBlackboardTest
+        working-directory: lean
+
+  # Real VS Code + official Lean 4 extension + this extension on examples/lean-sample.
+  integration:
+    runs-on: ubuntu-latest
+    needs: [node, lean]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - run: lake build
+        working-directory: examples/lean-sample
+      - run: npm ci
+      - run: xvfb-run -a npm run test:integration
+
+  # Precise mode on real Mathlib terms (downloads the Mathlib build cache, several GB).
+  mathlib:
+    runs-on: ubuntu-latest
+    needs: [lean]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install elan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Fetch Mathlib cache
+        run: lake exe cache get
+        working-directory: examples/lean-mathlib
+      - run: lake build MathlibGolden
+        working-directory: examples/lean-mathlib
