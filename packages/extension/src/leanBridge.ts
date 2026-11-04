@@ -44,6 +44,8 @@ interface Lean4Exports {
 const ERR_REQUEST_CANCELLED = -32800;
 const ERR_CONTENT_MODIFIED = -32801;
 const ERR_RPC_NEEDS_RECONNECT = -32900;
+const ERR_WORKER_EXITED = -32901;
+const ERR_WORKER_CRASHED = -32902;
 
 /** The server expires RPC sessions after 30 s without keep-alive (`keepAliveTimeMs`). */
 const KEEP_ALIVE_INTERVAL_MS = 10_000;
@@ -237,6 +239,11 @@ export class LeanBridge implements vscode.Disposable {
           this.log.warn(`RPC session ${sessionId} outdated for ${uri.toString()}; reconnecting.`);
           this.dropSessions((s) => s === session);
           continue;
+        }
+        const code = errorCode(e);
+        if (code === ERR_RPC_NEEDS_RECONNECT || code === ERR_WORKER_EXITED || code === ERR_WORKER_CRASHED) {
+          // The session is dead; the next call will connect a fresh one.
+          this.dropSessions((s) => s === session);
         }
         throw e;
       }

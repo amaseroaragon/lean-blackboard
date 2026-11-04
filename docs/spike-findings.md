@@ -34,7 +34,7 @@ Todo lo descrito en CLAUDE.md existe en la v0.0.240 con la misma forma. Detalles
   - `-32900` `RpcNeedsReconnect`, mensaje `"Outdated RPC session"`. Comprobado en la sonda con
     un `sessionId` inventado. Es el que dispara nuestra reconexión + reintento.
   - `-32901` `WorkerExited`, `-32902` `WorkerCrashed`: la InfoView oficial también descarta la
-    sesión con estos. Nosotros no reintentamos; la siguiente petición reconecta.
+    sesión con estos. Nosotros descartamos la sesión sin reintentar; la siguiente petición reconecta.
   - `-32800` `RequestCancelled`, `-32801` `ContentModified`: se tratan como cancelación silenciosa.
 - Caducidad: `keepAliveTimeMs = 30000` (`FileWorker/Utils.lean`). Keep-alive cada 10 s.
 - **Sorpresa: hay que liberar referencias RPC.** Cada `getInteractiveGoals` crea objetos en el
