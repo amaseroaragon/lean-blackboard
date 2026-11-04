@@ -171,10 +171,12 @@ extensión detecta si existe y cambia de modo sola. Evaluar reutilizar LeanTeX (
 Desde `packages/extension/` (de momento no hay workspaces):
 
 - `npm install`: dependencias de desarrollo.
-- `npm run build`: bundle con esbuild a `dist/extension.js`.
-- `npm run watch`: bundle en modo watch.
-- `npm run typecheck`: `tsc --noEmit` en modo strict.
-- Tests y lint: todavía no hay (llegan con `packages/core` en la Fase 2).
+- `npm run build`: bundles con esbuild: `dist/extension.js` (host) y `dist/webview.js` (UI).
+- `npm run watch`: bundles en modo watch.
+- `npm run typecheck`: `tsc --noEmit` en modo strict, para el host y para el webview (tiene su
+  propio `src/webview/tsconfig.json` con `DOM`).
+- `npm test`: tests de lógica pura con vitest (`test/`).
+- Lint: todavía no hay.
 
 Probar a mano: F5 en VS Code con la configuración "Run Extension (lean-sample)" (abre
 `examples/lean-sample`) o "Run Extension (empty window)" (sin ficheros Lean).
