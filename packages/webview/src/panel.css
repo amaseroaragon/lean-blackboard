@@ -139,6 +139,90 @@ pre {
   border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
 }
 
+/* Before/after: subterms changed by the step (precise mode). */
+[data-lbdiff='new'] {
+  border-radius: 2px;
+  background: var(--vscode-diffEditor-insertedTextBackground);
+}
+
+[data-lbdiff='old'] {
+  border-radius: 2px;
+  background: var(--vscode-diffEditor-removedTextBackground);
+}
+
+details.before {
+  margin: 6px 0;
+  opacity: 0.85;
+}
+
+details.before > summary {
+  cursor: pointer;
+  margin: 4px 0;
+}
+
+/* Messages. */
+.messages {
+  margin-top: 10px;
+}
+
+.msg {
+  margin: 6px 0;
+  padding: 4px 8px;
+  border-left: 2px solid var(--vscode-descriptionForeground);
+  background: var(--vscode-textCodeBlock-background);
+}
+
+.msg.error {
+  border-left-color: var(--vscode-errorForeground);
+}
+
+.msg.warning {
+  border-left-color: var(--vscode-editorWarning-foreground);
+}
+
+.msg-line {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-font-family);
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.msg-line.error {
+  color: var(--vscode-errorForeground);
+}
+
+.msg-line.warning {
+  color: var(--vscode-editorWarning-foreground);
+}
+
+.msg-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.msg-expr .katex {
+  font-size: 1.05em;
+}
+
+/* Pinned states. */
+.pin {
+  margin: 6px 0 10px;
+  padding: 4px 6px;
+  border: 1px dashed var(--vscode-widget-border, var(--vscode-panel-border));
+  border-radius: 3px;
+}
+
+.pin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+}
+
 /* Interactivity (precise mode). */
 .lb-hover {
   border-radius: 2px;

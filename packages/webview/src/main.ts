@@ -3,12 +3,13 @@
 // `'unsafe-inline'`.
 
 import type {
-  SubexprView,
   GoalView,
   HostMessage,
   HypView,
+  MessageView,
   Notation,
   PanelState,
+  SubexprView,
   ViewConfig,
   WebviewMessage,
 } from '@lean-blackboard/core';
@@ -17,13 +18,27 @@ import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import './panel.css';
 
+type GoalsState = Extract<PanelState, { kind: 'goals' }>;
+
+/** A goal state kept visible while the cursor moves elsewhere. */
+interface Pin {
+  id: number;
+  state: GoalsState;
+}
+
 /** Persisted across hide/show of the view (the webview is recreated). */
 interface SavedState {
   /** Notation the overrides were made against: they are dropped when the global one changes. */
   notation?: Notation;
   /** Per-row notation that differs from the global one, keyed by row id. */
   overrides?: Record<string, Notation>;
+  pins?: Pin[];
+  /** Whether the "Before" section is expanded (default: yes). */
+  beforeOpen?: boolean;
 }
+
+/** Pins kept at most; the oldest is dropped. */
+const MAX_PINS = 5;
 
 declare function acquireVsCodeApi(): {
   postMessage(msg: WebviewMessage): void;
@@ -38,6 +53,8 @@ let panelState: PanelState = { kind: 'waiting' };
 let config: ViewConfig = { notation: 'math', macros: {} };
 const saved = vscode.getState() ?? {};
 let overrides: Record<string, Notation> = saved.overrides ?? {};
+let pins: Pin[] = saved.pins ?? [];
+let beforeOpen = saved.beforeOpen ?? true;
 
 /** One displayable formula: a hypothesis or a goal target. */
 interface Row {
@@ -81,9 +98,9 @@ function renderMath(target: HTMLElement, latex: string, lean: string): void {
   renderKatex(target, latex, lean);
 }
 
-function renderKatex(target: HTMLElement, latex: string, lean: string): void {
+function renderKatex(target: HTMLElement, latex: string, lean: string, display = true): void {
   try {
-    katex.render(`\\displaystyle ${latex}`, target, {
+    katex.render(display ? `\\displaystyle ${latex}` : latex, target, {
       throwOnError: true,
       displayMode: false,
       strict: 'ignore',
@@ -114,7 +131,7 @@ function toggleRow(key: string): void {
 }
 
 function persist(): void {
-  vscode.setState({ notation: config.notation, overrides });
+  vscode.setState({ notation: config.notation, overrides, pins, beforeOpen });
 }
 
 function renderRow(row: Row): HTMLElement {
@@ -138,7 +155,7 @@ function renderRow(row: Row): HTMLElement {
 const MAX_BREAK_DEPTH = 3;
 
 function render(): void {
-  root.replaceChildren(...renderState(panelState));
+  root.replaceChildren(...renderPins(), ...renderState(panelState));
   fitFormulas();
 }
 
@@ -189,29 +206,119 @@ function renderState(state: PanelState): Node[] {
         state.mode === 'precise'
           ? 'Precise mode: LaTeX rendered by the LeanBlackboard Lean package from the real expressions'
           : 'Fast mode: LaTeX converted from the pretty-printed text (import LeanBlackboard for precise mode)';
-      const nodes: Node[] = [el('div', 'location', state.location, ' ', badge)];
+      const pin = button('Pin', 'Pin this goal state (keep it visible while moving)', () => pinState(state));
+      const nodes: Node[] = [el('div', 'location', state.location, ' ', badge, ' ', pin)];
       if (state.fallbackReason) {
         nodes.push(message(`Showing plain goals (interactive goals failed: ${state.fallbackReason})`, 'message warning'));
       }
-      if (state.goals === null) {
-        if (!state.termGoal) nodes.push(message('No tactic state at the cursor.'));
-      } else if (state.goals.length === 0) {
-        nodes.push(message('No goals.', 'message success'));
-      } else {
-        const n = state.goals.length;
-        const copyAll = button('Copy all', 'Copy all goals as LaTeX', () =>
-          vscode.postMessage({ type: 'copy', text: goalsToLatexDocument(state.goals, state.termGoal) }),
-        );
-        nodes.push(el('div', 'heading', el('h2', 'count', n === 1 ? '1 goal' : `${n} goals`), copyAll));
-        nodes.push(...state.goals.map((g, i) => renderGoal(g, `g${i}`)));
-      }
-      if (state.termGoal) {
-        nodes.push(el('h2', 'count', 'Expected type'));
-        nodes.push(renderGoal(state.termGoal, 'term'));
-      }
-      return nodes;
+      const before = renderBefore(state);
+      if (before) nodes.push(before);
+      nodes.push(...renderGoalsBody(state, ''));
+      if (state.messages && state.messages.length > 0) nodes.push(renderMessages(state.messages));
+      // Hover lookups use the state of the closest `data-source` (see `subexprOf`).
+      const wrapper = el('div', 'source', ...nodes);
+      wrapper.dataset.source = 'current';
+      return [wrapper];
     }
   }
+}
+
+/** Goals, "no goals" messages and expected type; `keyPrefix` keeps row keys unique per section. */
+function renderGoalsBody(state: GoalsState, keyPrefix: string): Node[] {
+  const nodes: Node[] = [];
+  if (state.goals === null) {
+    if (!state.termGoal) nodes.push(message('No tactic state at the cursor.'));
+  } else if (state.goals.length === 0) {
+    nodes.push(message('No goals.', 'message success'));
+  } else {
+    const n = state.goals.length;
+    const copyAll = button('Copy all', 'Copy all goals as LaTeX', () =>
+      vscode.postMessage({ type: 'copy', text: goalsToLatexDocument(state.goals, state.termGoal) }),
+    );
+    nodes.push(el('div', 'heading', el('h2', 'count', n === 1 ? '1 goal' : `${n} goals`), copyAll));
+    nodes.push(...state.goals.map((g, i) => renderGoal(g, `${keyPrefix}g${i}`)));
+  }
+  // The expected type often repeats the only goal (e.g. `exact` on the main goal): skip it then.
+  const repeatsGoal = state.goals?.length === 1 && goalsSignature([state.termGoal!]) === goalsSignature(state.goals);
+  if (state.termGoal && !repeatsGoal) {
+    nodes.push(el('h2', 'count', 'Expected type'));
+    nodes.push(renderGoal(state.termGoal, `${keyPrefix}term`));
+  }
+  return nodes;
+}
+
+/** Same goals with markers removed: used to hide "Before" when nothing changed. */
+function goalsSignature(goals: GoalView[] | null | undefined): string {
+  return JSON.stringify(
+    (goals ?? []).map((g) =>
+      g.kind === 'plain' ? g.text : [stripMarkers(g.typeLatex), g.hyps.map((h) => [h.names, stripMarkers(h.typeLatex)])],
+    ),
+  );
+}
+
+/** Collapsible "Before" section: the goals at the start of the line (before this step). */
+function renderBefore(state: GoalsState): HTMLElement | undefined {
+  const before = state.goalsBefore;
+  if (!before || goalsSignature(before) === goalsSignature(state.goals)) return undefined;
+  const details = el('details', 'before');
+  details.open = beforeOpen;
+  details.addEventListener('toggle', () => {
+    beforeOpen = details.open;
+    persist();
+  });
+  const n = before.length;
+  const summary = el('summary', 'count', `Before (${n === 0 ? 'no goals' : n === 1 ? '1 goal' : `${n} goals`})`);
+  details.append(summary, ...before.map((g, i) => renderGoal(g, `b${i}`)));
+  return details;
+}
+
+function renderMessages(messages: MessageView[]): HTMLElement {
+  const section = el('section', 'messages', el('h2', 'count', messages.length === 1 ? 'Message' : `Messages (${messages.length})`));
+  messages.forEach((m, i) => {
+    const header = el('button', `msg-line ${m.severity}`, `${m.severity} · line ${m.line + 1}`);
+    header.type = 'button';
+    header.title = 'Show in the editor';
+    header.addEventListener('click', () => vscode.postMessage({ type: 'reveal', line: m.line }));
+    const body = el('div', 'msg-body');
+    m.parts.forEach((p, j) => {
+      if (p.kind === 'text') {
+        body.append(el('span', 'msg-text', p.text));
+      } else if (p.kind === 'expr') {
+        const span = el('span', 'msg-expr');
+        if (notationOf(`m${i}e${j}`) === 'math') renderKatex(span, p.latex, p.lean, false);
+        else span.append(el('span', 'code', p.lean));
+        body.append(span);
+      } else {
+        body.append(renderGoal(p.goal, `m${i}g${j}`));
+      }
+    });
+    section.append(el('div', `msg ${m.severity}`, header, body));
+  });
+  return section;
+}
+
+function pinState(state: GoalsState): void {
+  const id = (pins.reduce((m, p) => Math.max(m, p.id), 0) || 0) + 1;
+  pins = [...pins, { id, state }].slice(-MAX_PINS);
+  persist();
+  render();
+}
+
+function unpin(id: number): void {
+  pins = pins.filter((p) => p.id !== id);
+  persist();
+  render();
+}
+
+function renderPins(): Node[] {
+  return pins.map((p) => {
+    const close = button('Unpin', 'Unpin this goal state', () => unpin(p.id));
+    const header = el('div', 'pin-header', el('span', 'pin-title', `📌 ${p.state.location}`), close);
+    const body = el('div', 'pin-body', ...renderGoalsBody(p.state, `p${p.id}`));
+    const node = el('section', 'pin', header, body);
+    node.dataset.source = `pin:${p.id}`;
+    return node;
+  });
 }
 
 function location(text: string): HTMLElement {
@@ -267,6 +374,10 @@ const isMac = navigator.userAgent.includes('Mac');
 
 function subexprOf(node: HTMLElement): SubexprView | undefined {
   const id = Number(node.dataset.lbid);
+  const source = node.closest<HTMLElement>('[data-source]')?.dataset.source;
+  if (source?.startsWith('pin:')) {
+    return pins.find((p) => `pin:${p.id}` === source)?.state.subexprs?.[id];
+  }
   return panelState.kind === 'goals' ? panelState.subexprs?.[id] : undefined;
 }
 
@@ -318,6 +429,9 @@ window.addEventListener('message', (e: MessageEvent<HostMessage>) => {
   if (msg?.type === 'state') {
     panelState = msg.state;
     setHovered(undefined, 0, 0);
+  } else if (msg?.type === 'pin') {
+    if (panelState.kind === 'goals') pinState(panelState);
+    return;
   } else if (msg?.type === 'config') {
     // A new global notation resets the per-row choices.
     if (saved.notation !== undefined && saved.notation !== msg.config.notation) overrides = {};

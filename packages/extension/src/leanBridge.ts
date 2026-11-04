@@ -231,6 +231,42 @@ export class LeanBridge implements vscode.Disposable {
     return this.rpcCall(uri, position, method, params, token, { releaseRefs: false });
   }
 
+  /**
+   * `Lean.Widget.getInteractiveDiagnostics` for one line. The result's RPC references stay alive
+   * (the precise mode passes them back to Lean) until `release` is called.
+   */
+  async interactiveDiagnostics(
+    uri: vscode.Uri,
+    line: number,
+    token: vscode.CancellationToken,
+  ): Promise<{ result: unknown; release: () => void }> {
+    let release = () => {};
+    const position = { line, character: 0 };
+    const result = await this.rpcCall(
+      uri,
+      position,
+      'Lean.Widget.getInteractiveDiagnostics',
+      { lineRange: { start: line, end: line + 1 } },
+      token,
+      { releaseRefs: false, onKeep: (r) => (release = r) },
+    );
+    return { result, release };
+  }
+
+  /** Precise mode: LaTeX for expressions given by their info references (`exprsLatex`). */
+  async exprsLatex(
+    uri: vscode.Uri,
+    line: number,
+    method: string,
+    infos: unknown[],
+    rules: unknown,
+    token: vscode.CancellationToken,
+  ): Promise<unknown> {
+    const position = { line, character: 0 };
+    // All fields explicit: the derived `RpcEncodable` decoder does not apply Lean defaults.
+    return this.rpcCall(uri, position, method, { infos, rules, interactive: false }, token, { releaseRefs: false });
+  }
+
   /** `Lean.Widget.getInteractiveTermGoal`: expected type at the position (term mode) or `null`. */
   async interactiveTermGoal(uri: vscode.Uri, position: Position, token: vscode.CancellationToken): Promise<unknown> {
     const params = { textDocument: { uri: uri.toString() }, position };
@@ -243,7 +279,8 @@ export class LeanBridge implements vscode.Disposable {
     method: string,
     params: unknown,
     token: vscode.CancellationToken,
-    opts: { releaseRefs: boolean },
+    /** `onKeep` receives a function that releases the result's references later. */
+    opts: { releaseRefs: boolean; onKeep?: (release: () => void) => void },
   ): Promise<unknown> {
     for (let attempt = 0; ; attempt++) {
       const client = this.requireClient(uri);
@@ -258,6 +295,7 @@ export class LeanBridge implements vscode.Disposable {
           token,
         );
         if (opts.releaseRefs) this.releaseRefs(client, uri.toString(), sessionId, result);
+        opts.onKeep?.(() => this.releaseRefs(client, uri.toString(), sessionId, result));
         return result;
       } catch (e) {
         if (errorCode(e) === ERR_RPC_NEEDS_RECONNECT && attempt === 0) {

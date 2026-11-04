@@ -30,6 +30,11 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
     return this.state;
   }
 
+  /** Asks the webview to pin what it currently shows. */
+  pin(): void {
+    this.send({ type: 'pin' });
+  }
+
   get visible(): boolean {
     return this.view?.visible ?? false;
   }
@@ -60,6 +65,16 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
           if (uri.scheme !== 'file') break;
           const pos = new vscode.Position(m.line, m.character);
           void vscode.window.showTextDocument(uri, { selection: new vscode.Range(pos, pos), preview: true });
+          break;
+        }
+        case 'reveal': {
+          // Click on a message: show its line in the Lean editor.
+          const editor = vscode.window.visibleTextEditors.find((e) => e.document.languageId === 'lean4');
+          if (!editor) break;
+          const pos = new vscode.Position(m.line, 0);
+          editor.selection = new vscode.Selection(pos, pos);
+          editor.revealRange(new vscode.Range(pos, pos));
+          void vscode.window.showTextDocument(editor.document, editor.viewColumn);
           break;
         }
         case 'copy':

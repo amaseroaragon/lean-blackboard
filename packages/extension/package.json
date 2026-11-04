@@ -48,6 +48,12 @@
         "title": "Copy Goal State as LaTeX",
         "category": "Lean Blackboard",
         "icon": "$(copy)"
+      },
+      {
+        "command": "leanBlackboard.pinGoalState",
+        "title": "Pin Goal State",
+        "category": "Lean Blackboard",
+        "icon": "$(pin)"
       }
     ],
     "viewsContainers": {
@@ -84,6 +90,11 @@
           "command": "leanBlackboard.copyGoalState",
           "when": "view == leanBlackboard.goals",
           "group": "navigation@2"
+        },
+        {
+          "command": "leanBlackboard.pinGoalState",
+          "when": "view == leanBlackboard.goals",
+          "group": "navigation@1"
         }
       ],
       "commandPalette": [

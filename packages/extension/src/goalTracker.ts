@@ -3,7 +3,11 @@
 
 import * as vscode from 'vscode';
 import {
+  PRECISE_EXPRS_METHOD,
   PRECISE_METHOD,
+  PRECISE_PROTOCOL_VERSION,
+  applyPreciseExprs,
+  interactiveDiagnosticsToView,
   PreciseProtocolError,
   interactiveGoalsToView,
   interactiveTermGoalToView,
@@ -11,7 +15,7 @@ import {
   preciseGoalsToView,
   rulesToWire,
 } from '@lean-blackboard/core';
-import type { PreciseView } from '@lean-blackboard/core';
+import type { MessageView, PreciseView } from '@lean-blackboard/core';
 import { CancelledError, ERR_METHOD_NOT_FOUND, LeanBridge, Position, describeError, errorCode, ms } from './leanBridge';
 import type { GoalsPanel } from './panel';
 import type { Settings } from './settings';
@@ -115,22 +119,35 @@ export class GoalTracker implements vscode.Disposable {
     const location = describeLocation(doc, pos);
 
     const t0 = performance.now();
+    // Messages on this line, in parallel with the goals (never fails the update).
+    const messagesP = this.messages(doc.uri, pos.line, token);
     try {
       const precise = await this.tryPrecise(doc.uri, position, token);
       if (token.isCancellationRequested) return;
       if (precise !== undefined) {
+        const messages = await messagesP;
+        if (token.isCancellationRequested) return;
         this.log.debug(`getGoalsLatex ${location} (${ms(t0)})`);
-        this.panel.setState({ kind: 'goals', location, ...precise, mode: 'precise' });
+        this.panel.setState({ kind: 'goals', location, ...precise, messages, mode: 'precise' });
         return;
       }
-      const [res, termRes] = await Promise.all([
-        this.bridge.interactiveGoals(doc.uri, position, token),
-        // The expected type is a bonus: never fail the whole update because of it.
-        this.bridge.interactiveTermGoal(doc.uri, position, token).catch((e: unknown) => {
+      // "Before": the goals at the start of the line (before its first tactic), as in precise mode.
+      const indent = doc.lineAt(pos.line).firstNonWhitespaceCharacterIndex;
+      const hasBefore = pos.character > indent && !doc.lineAt(pos.line).isEmptyOrWhitespace;
+      // The expected type and the previous state are bonuses: never fail the update because of them.
+      const bonus = (p: Promise<unknown>, what: string) =>
+        p.catch((e: unknown) => {
           if (e instanceof CancelledError) throw e;
-          this.log.debug(`getInteractiveTermGoal failed: ${describeError(e)}`);
+          this.log.debug(`${what} failed: ${describeError(e)}`);
           return null;
-        }),
+        });
+      const [res, termRes, beforeRes, messages] = await Promise.all([
+        this.bridge.interactiveGoals(doc.uri, position, token),
+        bonus(this.bridge.interactiveTermGoal(doc.uri, position, token), 'getInteractiveTermGoal'),
+        hasBefore
+          ? bonus(this.bridge.interactiveGoals(doc.uri, { line: pos.line, character: indent }, token), 'goals before')
+          : Promise.resolve(null),
+        messagesP,
       ]);
       if (token.isCancellationRequested) return;
       this.log.debug(`getInteractiveGoals ${location} (${ms(t0)})`);
@@ -139,6 +156,8 @@ export class GoalTracker implements vscode.Disposable {
         location,
         goals: interactiveGoalsToView(res, this.settings.rules),
         termGoal: interactiveTermGoalToView(termRes, this.settings.rules),
+        goalsBefore: interactiveGoalsToView(beforeRes, this.settings.rules) ?? undefined,
+        messages,
         mode: 'fast',
       });
       return;
@@ -165,6 +184,50 @@ export class GoalTracker implements vscode.Disposable {
     } finally {
       if (this.inFlight === cts) this.inFlight = undefined;
       cts.dispose();
+    }
+  }
+
+  /**
+   * Messages on `line`. In precise mode their expressions are rendered again from the real
+   * `Expr`s (the infoview references are passed back to Lean, then released).
+   */
+  private async messages(uri: vscode.Uri, line: number, token: vscode.CancellationToken): Promise<MessageView[] | undefined> {
+    try {
+      const { result, release } = await this.bridge.interactiveDiagnostics(uri, line, token);
+      try {
+        const rules = this.settings.rules;
+        const { messages, exprRefs } = interactiveDiagnosticsToView(result, rules);
+        const wanted = exprRefs.map((r, i) => ({ r, i })).filter((x) => x.r !== undefined);
+        const checked = this.noPrecise.get(uri.toString());
+        const preciseOk = this.settings.mode !== 'fast' && (checked === undefined || Date.now() - checked >= PRECISE_RETRY_MS);
+        if (preciseOk && wanted.length > 0) {
+          try {
+            const res = (await this.bridge.exprsLatex(
+              uri,
+              line,
+              PRECISE_EXPRS_METHOD,
+              wanted.map((x) => x.r),
+              rulesToWire(rules),
+              token,
+            )) as { version?: number; latex?: string[] } | null;
+            if (res?.version === PRECISE_PROTOCOL_VERSION && Array.isArray(res.latex)) {
+              const aligned: string[] = new Array(exprRefs.length).fill('');
+              wanted.forEach((x, k) => (aligned[x.i] = res.latex?.[k] ?? ''));
+              applyPreciseExprs(messages, aligned);
+            }
+          } catch (e) {
+            if (e instanceof CancelledError) throw e;
+            this.log.debug(`exprsLatex failed: ${describeError(e)}`);
+          }
+        }
+        return messages;
+      } finally {
+        release();
+      }
+    } catch (e) {
+      if (e instanceof CancelledError) throw e;
+      this.log.debug(`getInteractiveDiagnostics failed: ${describeError(e)}`);
+      return undefined;
     }
   }
 

@@ -37,6 +37,7 @@ export function activate(context: vscode.ExtensionContext): LeanBlackboardApi {
       await vscode.env.clipboard.writeText(goalsToLatexDocument(state.goals, state.termGoal));
       vscode.window.setStatusBarMessage('Lean Blackboard: goal state copied as LaTeX', 2000);
     }),
+    vscode.commands.registerCommand('leanBlackboard.pinGoalState', () => panel.pin()),
     vscode.commands.registerCommand('leanBlackboard.toggleNotation', () =>
       settings.setNotation(settings.view.notation === 'math' ? 'lean' : 'math'),
     ),
