@@ -126,6 +126,30 @@ test('messages with expressions on the cursor line', async () => {
   assert.ok(parts.some((p) => p.kind === 'expr' && p.latex.includes('<')), 'expression rendered as maths');
 });
 
+test('goals update after an edit while the file keeps elaborating (simp only)', async () => {
+  const editor = await openAt('Ticks.lean', 'simp only [Nat.add_zero, Nat.mul_one]');
+  await waitFor('initial goals', goalsWhere((s) => (s.goals?.length ?? 0) > 0));
+  // Edit inside the brackets (as when typing a lemma), which re-elaborates the rest of the file:
+  // its slow commands keep changing the diagnostics for a few seconds.
+  const line = editor.selection.active.line;
+  const text = editor.document.lineAt(line).text;
+  const inside = text.indexOf('Nat.mul_one');
+  await editor.edit((b) => b.insert(new vscode.Position(line, inside), ' '));
+  // Then click after `]`: the panel must show the state after `simp only` while the rest of the
+  // file is still elaborating, not only once everything is done.
+  const after = editor.document.lineAt(line).text.indexOf(']') + 1;
+  editor.selection = new vscode.Selection(line, after, line, after);
+  const t0 = Date.now();
+  await waitFor(
+    'goals after simp',
+    goalsWhere((s) => s.goals?.[0]?.kind === 'structured' && /a = b/.test(s.goals[0].type)),
+    20_000,
+  );
+  const elapsed = Date.now() - t0;
+  assert.ok(elapsed < 2500, `goals took ${elapsed} ms to update (the file was still elaborating)`);
+  await editor.edit((b) => b.delete(new vscode.Range(line, inside, line, inside + 1)));
+});
+
 test('pin command runs', async () => {
   await vscode.commands.executeCommand('leanBlackboard.pinGoalState');
 });

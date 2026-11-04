@@ -13,6 +13,7 @@ export interface LeanBlackboardApi {
 
 export function activate(context: vscode.ExtensionContext): LeanBlackboardApi {
   const log = vscode.window.createOutputChannel('Lean Blackboard', { log: true });
+  log.info(`Lean Blackboard v${String(context.extension.packageJSON.version)} activated.`);
   const bridge = new LeanBridge(log);
   const settings = new Settings(context.globalState, log);
   const panel = new GoalsPanel(context.extensionUri, settings);
