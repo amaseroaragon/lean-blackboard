@@ -200,10 +200,14 @@ export class LeanBridge implements vscode.Disposable {
     return this.request(client, '$/lean/plainGoal', { textDocument: { uri: uri.toString() }, position }, token);
   }
 
-  /** `Lean.Widget.getInteractiveGoals` over RPC: `{ goals: InteractiveGoal[] } | null`. */
+  /**
+   * `Lean.Widget.getInteractiveGoals` over RPC: `{ goals: InteractiveGoal[] } | null`.
+   * The RPC references in the result (`SubexprInfo.info`, `InteractiveGoal.ctx`) are released
+   * immediately, so they must not be used for follow-up calls.
+   */
   async interactiveGoals(uri: vscode.Uri, position: Position, token: vscode.CancellationToken): Promise<unknown> {
     const params = { textDocument: { uri: uri.toString() }, position };
-    return this.rpcCall(uri, position, 'Lean.Widget.getInteractiveGoals', params, token);
+    return this.rpcCall(uri, position, 'Lean.Widget.getInteractiveGoals', params, token, { releaseRefs: true });
   }
 
   private async rpcCall(
@@ -212,6 +216,7 @@ export class LeanBridge implements vscode.Disposable {
     method: string,
     params: unknown,
     token: vscode.CancellationToken,
+    opts: { releaseRefs: boolean },
   ): Promise<unknown> {
     for (let attempt = 0; ; attempt++) {
       const client = this.requireClient(uri);
@@ -219,12 +224,14 @@ export class LeanBridge implements vscode.Disposable {
       const sessionId = await session.sessionId;
       if (token.isCancellationRequested) throw new CancelledError();
       try {
-        return await this.request(
+        const result = await this.request(
           client,
           '$/lean/rpc/call',
           { sessionId, method, params, textDocument: { uri: uri.toString() }, position },
           token,
         );
+        if (opts.releaseRefs) this.releaseRefs(client, uri.toString(), sessionId, result);
+        return result;
       } catch (e) {
         if (errorCode(e) === ERR_RPC_NEEDS_RECONNECT && attempt === 0) {
           this.log.warn(`RPC session ${sessionId} outdated for ${uri.toString()}; reconnecting.`);
@@ -269,6 +276,16 @@ export class LeanBridge implements vscode.Disposable {
       },
     );
     return session;
+  }
+
+  /** Without this, every call leaks server-side objects until the session expires. */
+  private releaseRefs(client: LeanClient, uri: string, sessionId: string, result: unknown): void {
+    const refs: unknown[] = [];
+    collectRpcRefs(result, refs);
+    if (refs.length === 0 || !client.isRunning()) return;
+    client
+      .sendNotification('$/lean/rpc/release', { uri, sessionId, refs })
+      ?.catch((e: unknown) => this.log.warn(`rpc/release failed: ${describeError(e)}`));
   }
 
   private dropSessions(pred: (s: RpcSession) => boolean): void {
@@ -326,6 +343,24 @@ export function describeError(e: unknown): string {
   const code = errorCode(e);
   const msg = e instanceof Error ? e.message : JSON.stringify(e);
   return code === undefined ? msg : `[${code}] ${msg}`;
+}
+
+/**
+ * RPC references are objects with a single string field: `__rpcref` with wire format v1 (what
+ * the official client negotiates) or `p` with v0. Same detection as the official InfoView.
+ */
+function collectRpcRefs(v: unknown, out: unknown[]): void {
+  if (Array.isArray(v)) {
+    for (const x of v) collectRpcRefs(x, out);
+  } else if (typeof v === 'object' && v !== null) {
+    const keys = Object.keys(v);
+    const rec = v as Record<string, unknown>;
+    if (keys.length === 1 && (keys[0] === '__rpcref' || keys[0] === 'p') && typeof rec[keys[0]] === 'string') {
+      out.push(v);
+      return;
+    }
+    for (const x of Object.values(rec)) collectRpcRefs(x, out);
+  }
 }
 
 function describeFolder(f: LeanExtUri): string {
