@@ -1,5 +1,14 @@
 name = "lean-sample"
-defaultTargets = ["LeanSample"]
+defaultTargets = ["LeanSample", "FastSample"]
+
+# Companion package for precise mode (local path; see docs/modo-preciso.md).
+[[require]]
+name = "LeanBlackboard"
+path = "../../lean"
 
 [[lean_lib]]
 name = "LeanSample"
+
+# Same kind of proofs WITHOUT `import LeanBlackboard`: exercises the fast mode.
+[[lean_lib]]
+name = "FastSample"
