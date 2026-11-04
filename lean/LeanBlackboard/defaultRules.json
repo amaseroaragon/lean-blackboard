@@ -1,0 +1,301 @@
+{
+  "symbols": [
+    {
+      "name": "∅",
+      "latex": "\\emptyset"
+    },
+    {
+      "name": "∞",
+      "latex": "\\infty"
+    },
+    {
+      "name": "⊤",
+      "latex": "\\top"
+    },
+    {
+      "name": "⊥",
+      "latex": "\\bot"
+    },
+    {
+      "name": "ℂ",
+      "latex": "\\mathbb{C}"
+    },
+    {
+      "name": "Complex",
+      "latex": "\\mathbb{C}"
+    },
+    {
+      "name": "False",
+      "latex": "\\mathrm{False}"
+    },
+    {
+      "name": "Int",
+      "latex": "\\mathbb{Z}"
+    },
+    {
+      "name": "ℕ",
+      "latex": "\\mathbb{N}"
+    },
+    {
+      "name": "Nat",
+      "latex": "\\mathbb{N}"
+    },
+    {
+      "name": "Prop",
+      "latex": "\\mathrm{Prop}"
+    },
+    {
+      "name": "ℚ",
+      "latex": "\\mathbb{Q}"
+    },
+    {
+      "name": "ℝ",
+      "latex": "\\mathbb{R}"
+    },
+    {
+      "name": "Rat",
+      "latex": "\\mathbb{Q}"
+    },
+    {
+      "name": "Real",
+      "latex": "\\mathbb{R}"
+    },
+    {
+      "name": "Real.pi",
+      "latex": "\\pi"
+    },
+    {
+      "name": "True",
+      "latex": "\\mathrm{True}"
+    },
+    {
+      "name": "Type",
+      "latex": "\\mathrm{Type}"
+    },
+    {
+      "name": "ℤ",
+      "latex": "\\mathbb{Z}"
+    },
+    {
+      "name": "π",
+      "latex": "\\pi"
+    }
+  ],
+  "functions": [
+    {
+      "name": "abs",
+      "arity": 1,
+      "template": "\\left|{#1}\\right|"
+    },
+    {
+      "name": "arctan",
+      "arity": 1,
+      "template": "\\arctan #1"
+    },
+    {
+      "name": "Complex.exp",
+      "arity": 1,
+      "template": "\\exp #1"
+    },
+    {
+      "name": "Complex.im",
+      "arity": 1,
+      "template": "\\operatorname{Im} #1"
+    },
+    {
+      "name": "Complex.re",
+      "arity": 1,
+      "template": "\\operatorname{Re} #1"
+    },
+    {
+      "name": "cos",
+      "arity": 1,
+      "template": "\\cos #1"
+    },
+    {
+      "name": "deriv",
+      "arity": 2,
+      "template": "{#1}'\\left({#2}\\right)"
+    },
+    {
+      "name": "exp",
+      "arity": 1,
+      "template": "\\exp #1"
+    },
+    {
+      "name": "Finset.card",
+      "arity": 1,
+      "template": "\\left|{#1}\\right|"
+    },
+    {
+      "name": "Int.ceil",
+      "arity": 1,
+      "template": "\\left\\lceil {#1}\\right\\rceil"
+    },
+    {
+      "name": "Int.floor",
+      "arity": 1,
+      "template": "\\left\\lfloor {#1}\\right\\rfloor"
+    },
+    {
+      "name": "log",
+      "arity": 1,
+      "template": "\\log #1"
+    },
+    {
+      "name": "logb",
+      "arity": 2,
+      "template": "\\log_{{#1}} #2"
+    },
+    {
+      "name": "Nat.ceil",
+      "arity": 1,
+      "template": "\\left\\lceil {#1}\\right\\rceil_{+}"
+    },
+    {
+      "name": "Nat.choose",
+      "arity": 2,
+      "template": "\\binom{#1}{#2}"
+    },
+    {
+      "name": "Nat.factorial",
+      "arity": 1,
+      "template": "#1!"
+    },
+    {
+      "name": "Nat.floor",
+      "arity": 1,
+      "template": "\\left\\lfloor {#1}\\right\\rfloor_{+}"
+    },
+    {
+      "name": "Nat.gcd",
+      "arity": 2,
+      "template": "\\gcd\\left({#1}, {#2}\\right)"
+    },
+    {
+      "name": "Nat.lcm",
+      "arity": 2,
+      "template": "\\operatorname{lcm}\\left({#1}, {#2}\\right)"
+    },
+    {
+      "name": "Norm.norm",
+      "arity": 1,
+      "template": "\\left\\|{#1}\\right\\|"
+    },
+    {
+      "name": "Real.arctan",
+      "arity": 1,
+      "template": "\\arctan #1"
+    },
+    {
+      "name": "Real.cos",
+      "arity": 1,
+      "template": "\\cos #1"
+    },
+    {
+      "name": "Real.cosh",
+      "arity": 1,
+      "template": "\\cosh #1"
+    },
+    {
+      "name": "Real.exp",
+      "arity": 1,
+      "template": "\\exp #1"
+    },
+    {
+      "name": "Real.log",
+      "arity": 1,
+      "template": "\\log #1"
+    },
+    {
+      "name": "Real.logb",
+      "arity": 2,
+      "template": "\\log_{{#1}} #2"
+    },
+    {
+      "name": "Real.sin",
+      "arity": 1,
+      "template": "\\sin #1"
+    },
+    {
+      "name": "Real.sinh",
+      "arity": 1,
+      "template": "\\sinh #1"
+    },
+    {
+      "name": "Real.sqrt",
+      "arity": 1,
+      "template": "\\sqrt{#1}"
+    },
+    {
+      "name": "Real.tan",
+      "arity": 1,
+      "template": "\\tan #1"
+    },
+    {
+      "name": "Real.tanh",
+      "arity": 1,
+      "template": "\\tanh #1"
+    },
+    {
+      "name": "rexp",
+      "arity": 1,
+      "template": "\\exp #1"
+    },
+    {
+      "name": "Set.Icc",
+      "arity": 2,
+      "template": "\\left[{#1}, {#2}\\right]"
+    },
+    {
+      "name": "Set.Ici",
+      "arity": 1,
+      "template": "\\left[{#1}, \\infty\\right)"
+    },
+    {
+      "name": "Set.Ico",
+      "arity": 2,
+      "template": "\\left[{#1}, {#2}\\right)"
+    },
+    {
+      "name": "Set.Iic",
+      "arity": 1,
+      "template": "\\left(-\\infty, {#1}\\right]"
+    },
+    {
+      "name": "Set.Iio",
+      "arity": 1,
+      "template": "\\left(-\\infty, {#1}\\right)"
+    },
+    {
+      "name": "Set.Ioc",
+      "arity": 2,
+      "template": "\\left({#1}, {#2}\\right]"
+    },
+    {
+      "name": "Set.Ioi",
+      "arity": 1,
+      "template": "\\left({#1}, \\infty\\right)"
+    },
+    {
+      "name": "Set.Ioo",
+      "arity": 2,
+      "template": "\\left({#1}, {#2}\\right)"
+    },
+    {
+      "name": "sin",
+      "arity": 1,
+      "template": "\\sin #1"
+    },
+    {
+      "name": "sqrt",
+      "arity": 1,
+      "template": "\\sqrt{#1}"
+    },
+    {
+      "name": "tan",
+      "arity": 1,
+      "template": "\\tan #1"
+    }
+  ]
+}

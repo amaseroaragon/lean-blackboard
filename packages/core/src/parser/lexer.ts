@@ -17,7 +17,7 @@ const OPERATORS = [
   '<->', '⁻¹', '∃!', '::', '++', ':=', '=>', '==', '!=', '<=', '>=', '->', '&&', '||', '//',
   '≠', '≤', '≥', '→', '↔', '∧', '∨', '¬', '=', '<', '>', '∈', '∉', '⊆', '⊂', '⊇', '⊃', '∪', '∩',
   '\\', '+', '-', '*', '/', '%', '^', '•', '∘', '×', '∣', '≈', '≍', '⊕',
-  '∑', '∏', '∀', '∃', '√', '↑', '⇑', '↥', '!', '#', '↦', 'λ',
+  '∑', '∏', '∀', '∃', '√', '↑', '⇑', '↥', '!', '#', '↦', 'λ', 'ᶜ',
   ',', ':', '|', '‖', '⌊', '⌋', '⌈', '⌉', '(', ')', '[', ']', '{', '}', '⟨', '⟩', '⦃', '⦄', '·', '@', '.',
 ].sort((a, b) => b.length - a.length);
 
@@ -27,8 +27,8 @@ const SYMBOL_IDENTS = new Set(['∅', '∞', '⊤', '⊥']);
 const SUBSCRIPTS = '₀₁₂₃₄₅₆₇₈₉ₐₑₒₓₔₕₖₗₘₙₚₛₜᵢᵣᵤᵥⱼ';
 const SUPERSCRIPT_DIGITS = '⁰¹²³⁴⁵⁶⁷⁸⁹';
 
-/** Lean excludes these Greek letters from identifiers (they are notation). */
-const NON_IDENT_LETTERS = new Set(['λ', 'Π', 'Σ']);
+/** Letters Lean excludes from identifiers (they are notation): `λ Π Σ` and the complement `ᶜ`. */
+const NON_IDENT_LETTERS = new Set(['λ', 'Π', 'Σ', 'ᶜ']);
 
 function isLetter(c: string): boolean {
   return /\p{L}/u.test(c) && !NON_IDENT_LETTERS.has(c);

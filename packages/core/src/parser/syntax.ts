@@ -77,8 +77,8 @@ export const PREFIX: Record<string, PrefixSyntax> = {
   '√': { prec: 100, argPrec: 100 },
 };
 
-/** Postfix operators; all at max precedence (`⁻¹`, factorial `n !`). */
-export const POSTFIX = new Set(['⁻¹', '!']);
+/** Postfix operators; all at max precedence (`⁻¹`, factorial `n !`, complement `sᶜ`). */
+export const POSTFIX = new Set(['⁻¹', '!', 'ᶜ']);
 
 export interface BinderSyntax {
   /** Precedence of the whole binder term. */

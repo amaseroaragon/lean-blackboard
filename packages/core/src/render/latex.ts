@@ -23,6 +23,19 @@ export function texttt(text: string): string {
   return `\\texttt{${safe}}`;
 }
 
+/**
+ * Templates ending in a closing delimiter (`\sqrt{…}`, `\left|…\right|`, `\binom{…}{…}`) are
+ * self-delimiting. Same rule as `closesWithDelimiter` in `lean/LeanBlackboard/Latex.lean`.
+ */
+export function closesWithDelimiter(template: string): boolean {
+  return /(\}|\\right(\)|\]|\||\\\||\\rangle)|\\rfloor|\\rceil|\\rangle)\s*$/.test(template);
+}
+
+/** `Finset.range`, also printed as `range` under `open Finset`. */
+const RANGE_NAMES = new Set(['Finset.range', 'range']);
+const TENDSTO_NAMES = new Set(['Filter.Tendsto', 'Tendsto']);
+const AT_TOP_NAMES = new Set(['Filter.atTop', 'atTop']);
+
 /** Number sets: binders over them read `x \in \mathbb{N}` instead of `x : \mathbb{N}`. */
 const SET_LIKE_HEADS = new Set(['Set', 'Finset', 'Fin']);
 
@@ -31,8 +44,12 @@ export class LatexRenderer {
 
   render(t: Term): string {
     switch (t.k) {
-      case 'ident':
+      case 'ident': {
+        // `z.re` with no arguments: a unary function rule in field notation.
+        const field = this.rules.functions[t.name] ? undefined : this.fieldRule(t.name);
+        if (field && field.rule.arity === 1) return this.applyRule(field.rule, [field.obj]);
         return this.renderIdent(t.name, false);
+      }
       case 'num':
         return t.text;
       case 'str':
@@ -93,17 +110,80 @@ export class LatexRenderer {
     });
   }
 
+  /**
+   * Field notation on a variable (`n.choose 2`, `z.re`) resolved against the function rules: if
+   * exactly one template matches `*.choose`, render it with the object as first argument.
+   */
+  private fieldRule(name: string): { obj: Term; rule: { arity: number; template: string } } | undefined {
+    const segments = name.split('.');
+    if (segments.length !== 2 || !/^\p{Ll}/u.test(segments[0]) || /^\d+$/.test(segments[1])) return undefined;
+    const suffix = `.${segments[1]}`;
+    const matches = Object.entries(this.rules.functions).filter(([k]) => k.endsWith(suffix));
+    const templates = new Set(matches.map(([, r]) => `${r.arity}:${r.template}`));
+    if (templates.size !== 1) return undefined;
+    return { obj: { k: 'ident', name: segments[0] }, rule: matches[0][1] };
+  }
+
   private renderApp(fn: Term, args: Term[]): string {
     if (fn.k === 'ident') {
+      const special = this.renderSpecial(fn.name, args);
+      if (special !== undefined) return special;
       const rule = this.rules.functions[fn.name];
-      if (rule && args.length >= rule.arity) {
-        const applied = this.fill(rule.template, args.slice(0, rule.arity));
-        const rest = args.slice(rule.arity);
-        return rest.length === 0 ? applied : `${applied}${this.argList(rest)}`;
+      if (rule && args.length >= rule.arity) return this.applyRule(rule, args);
+      if (!rule) {
+        const field = this.fieldRule(fn.name);
+        if (field && args.length + 1 >= field.rule.arity) return this.applyRule(field.rule, [field.obj, ...args]);
       }
       return this.renderIdent(fn.name, true) + this.argList(args);
     }
     return this.render(fn) + this.argList(args);
+  }
+
+  /** Notations that need structure, not just a template: derivatives and limits. */
+  private renderSpecial(name: string, args: Term[]): string | undefined {
+    if (name === 'deriv' && args.length === 2) {
+      const f = strip(args[0]);
+      if (f.k !== 'binder' || f.q !== 'fun') return undefined;
+      const vars = f.groups.flatMap((g) => g.names);
+      if (vars.length !== 1) return undefined;
+      const v = identToLatex(vars[0], this.rules.symbols);
+      const body = `\\frac{d}{d${v}}\\left(${this.render(f.body)}\\right)`;
+      const at = strip(args[1]);
+      if (at.k === 'ident' && at.name === vars[0]) return body;
+      return `\\left.${body}\\right|_{${v} = ${this.render(at)}}`;
+    }
+    if (TENDSTO_NAMES.has(name) && args.length === 3) {
+      const source = this.limitTarget(args[1]);
+      const target = this.limitTarget(args[2]);
+      if (!source || !target) return undefined;
+      const f = strip(args[0]);
+      let v = 'x';
+      let value: string;
+      if (f.k === 'binder' && f.q === 'fun' && f.groups.flatMap((g) => g.names).length === 1) {
+        v = identToLatex(f.groups[0].names[0], this.rules.symbols);
+        value = this.render(f.body);
+      } else {
+        value = `${this.render(f)}\\left(${v}\\right)`;
+      }
+      return `\\lim_{${v} \\to ${source}} ${value} = ${target}`;
+    }
+    return undefined;
+  }
+
+  /** `atTop` → `\infty`, `nhds a` → `a`; anything else is not a simple limit. */
+  private limitTarget(t: Term): string | undefined {
+    const s = strip(t);
+    if (s.k === 'ident' && AT_TOP_NAMES.has(s.name)) return '\\infty';
+    if (s.k === 'app' && s.fn.k === 'ident' && s.fn.name === 'nhds' && s.args.length === 1) {
+      return this.render(strip(s.args[0]));
+    }
+    return undefined;
+  }
+
+  private applyRule(rule: { arity: number; template: string }, args: Term[]): string {
+    const applied = this.fill(rule.template, args.slice(0, rule.arity));
+    const rest = args.slice(rule.arity);
+    return rest.length === 0 ? applied : `${applied}${this.argList(rest)}`;
   }
 
   /**
@@ -122,9 +202,12 @@ export class LatexRenderer {
 
   /** Parenthesises an operand of `^`/postfix if it is a function rule application (`\\sin x`). */
   private protectBase(t: Term): Term | string {
-    if (t.k === 'app' && t.fn.k === 'ident' && this.rules.functions[t.fn.name]) {
-      return `\\left(${this.render(t)}\\right)`;
-    }
+    // The rule applied to `t`, if any; self-delimiting templates (`\sqrt{…}`, `\left|…\right|`)
+    // need no parentheses.
+    const ruleFor = (n: string) => this.rules.functions[n] ?? this.fieldRule(n)?.rule;
+    const rule =
+      t.k === 'app' && t.fn.k === 'ident' ? ruleFor(t.fn.name) : t.k === 'ident' ? this.fieldRule(t.name)?.rule : undefined;
+    if (rule && !closesWithDelimiter(rule.template)) return `\\left(${this.render(t)}\\right)`;
     return t;
   }
 
@@ -172,7 +255,7 @@ export class LatexRenderer {
     const g = groups[0];
     const rhs = g.pred?.rhs;
     if (g.names.length !== 1 || g.pred?.op !== '∈' || !rhs || rhs.k !== 'app') return undefined;
-    if (rhs.fn.k !== 'ident' || rhs.fn.name !== 'Finset.range' || rhs.args.length !== 1) return undefined;
+    if (rhs.fn.k !== 'ident' || !RANGE_NAMES.has(rhs.fn.name) || rhs.args.length !== 1) return undefined;
     const n = strip(rhs.args[0]);
     const upper =
       n.k === 'binop' && n.op === '+' && n.rhs.k === 'num' && n.rhs.text === '1'

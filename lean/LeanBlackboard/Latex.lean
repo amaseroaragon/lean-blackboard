@@ -62,6 +62,19 @@ def Ctx.ofRules (r : Rules) : Ctx where
 
 abbrev LatexM := ReaderT Ctx MetaM
 
+/--
+Templates ending in a closing delimiter (`\sqrt{…}`, `\left|…\right|`, `\binom{…}{…}`) are
+self-delimiting: no parentheses are needed when they are, e.g., the base of a power.
+-/
+def closesWithDelimiter (template : String) : Bool :=
+  let t := template.trimAsciiEnd.toString
+  t.endsWith "}" || [")", "]", "|", "\\|", "\\rfloor", "\\rceil", "\\rangle"].any fun d =>
+    t.endsWith ("\\right" ++ d) || (d.startsWith "\\r" && t.endsWith d)
+
+/-- `Set α` / `Finset α`: `≤`/`<` on them is inclusion. -/
+def isSetType (t : Expr) : Bool :=
+  t.isAppOf `Set || t.isAppOf `Finset
+
 /-- Fills `#n` / `{#n}` placeholders (see module doc). -/
 def fillTemplate (template : String) (args : Array Tex) : String := Id.run do
   let cs := template.toList.toArray
@@ -205,7 +218,8 @@ partial def renderApp (e : Expr) : LatexM Tex := do
       if rule.arity ≤ explicit.size then
         let applied := fillTemplate rule.template (← explicit[:rule.arity].toArray.mapM render)
         let rest := explicit[rule.arity:].toArray
-        if rest.isEmpty then return { s := applied, prec := argPrec }
+        let prec := if closesWithDelimiter rule.template then maxPrec else argPrec
+        if rest.isEmpty then return { s := applied, prec }
         return { s := applied ++ (← argList rest), prec := argPrec }
     if explicit.isEmpty then return atom (constLatex (← read) c false)
     return { s := constLatex (← read) c true ++ (← argList explicit), prec := maxPrec }
@@ -240,10 +254,14 @@ partial def renderKnown (c : Name) (args : Array Expr) : LatexM (Option Tex) := 
   | ``Iff, 2 => some <$> binop "\\iff" 20 .eq args[0]! args[1]!
   | ``Eq, 3 => some <$> binop "=" 50 .eq args[1]! args[2]!
   | ``Ne, 3 => some <$> binop "\\neq" 50 .eq args[1]! args[2]!
-  | ``LT.lt, 4 => some <$> binop "<" 50 .eq args[2]! args[3]!
-  | ``LE.le, 4 => some <$> binop "\\leq" 50 .eq args[2]! args[3]!
-  | ``GT.gt, 4 => some <$> binop ">" 50 .eq args[2]! args[3]!
-  | ``GE.ge, 4 => some <$> binop "\\geq" 50 .eq args[2]! args[3]!
+  -- On sets the order is inclusion (Mathlib elaborates `s ⊆ t` on `Set` as `s ≤ t`).
+  | ``LT.lt, 4 => some <$> binop (if isSetType args[0]! then "\\subsetneq" else "<") 50 .eq args[2]! args[3]!
+  | ``LE.le, 4 => some <$> binop (if isSetType args[0]! then "\\subseteq" else "\\leq") 50 .eq args[2]! args[3]!
+  | ``GT.gt, 4 => some <$> binop (if isSetType args[0]! then "\\supsetneq" else ">") 50 .eq args[2]! args[3]!
+  | ``GE.ge, 4 => some <$> binop (if isSetType args[0]! then "\\supseteq" else "\\geq") 50 .eq args[2]! args[3]!
+  | ``EmptyCollection.emptyCollection, 2 => return some (atom "\\emptyset")
+  | `Set.ofPred, 2 => renderSetOf args[0]! args[1]!
+  | `setOf, 2 => renderSetOf args[0]! args[1]!
   | ``Membership.mem, 5 => some <$> binop "\\in" 50 .eq args[4]! args[3]!
   | ``HasSubset.Subset, 4 => some <$> binop "\\subseteq" 50 .eq args[2]! args[3]!
   | ``HasSSubset.SSubset, 4 => some <$> binop "\\subset" 50 .eq args[2]! args[3]!
@@ -288,13 +306,83 @@ partial def renderKnown (c : Name) (args : Array Expr) : LatexM (Option Tex) := 
     let t ← render args[3]!
     let f ← render args[4]!
     return some (atom s!"\\begin\{cases} {t.s} & \\text\{if } {cond.s} \\\\ {f.s} & \\text\{otherwise} \\end\{cases}")
-  | ``Exists, 2 => renderExists args[1]!
+  | ``Exists, 2 => renderExists "\\exists" args[1]!
+  -- Mathlib constants, matched by name (the package does not depend on Mathlib).
+  | `ExistsUnique, 2 => renderExists "\\exists!" args[1]!
   | `Finset.sum, 5 => renderBigOp "\\sum" args[3]! args[4]!
   | `Finset.prod, 5 => renderBigOp "\\prod" args[3]! args[4]!
+  | `Compl.compl, 3 =>
+    let a ← render args[2]!
+    return some { s := s!"{a.paren maxPrec}^\{\\complement}", prec := argPrec }
+  | `deriv, 8 => renderDeriv args[6]! args[7]!
+  | `intervalIntegral, 7 => renderIntegral args[3]! (some (args[4]!, args[5]!)) none
+  | `MeasureTheory.integral, 7 =>
+    -- `∫ x in s, f x` is `integral (volume.restrict s) f`.
+    let μ := args[5]!
+    let dom? := if μ.isAppOf `MeasureTheory.Measure.restrict then μ.getAppArgs.back? else none
+    renderIntegral args[6]! none dom?
+  | `Filter.Tendsto, 5 => renderLimit args[0]! args[2]! args[3]! args[4]!
   | _, _ => return none
 
+/-- Runs `k` with the variable and body of `f` if it is a lambda, else with a fresh `x` and `f x`. -/
+partial def withFunBody (f : Expr) (dflt : Name) (k : String → Expr → LatexM Tex) : LatexM Tex := do
+  match f with
+  | .lam n t b bi =>
+    withLocalDecl (binderName n) bi t fun x => do k (← fvarLatex x.fvarId!) (b.instantiate1 x)
+  | _ =>
+    let ty ← whnf (← inferType f)
+    let .forallE _ dom _ _ := ty | throwError "not a function"
+    withLocalDeclD dflt dom fun x => do k (← fvarLatex x.fvarId!) (mkApp f x)
+
+/-- `deriv (fun x => e) x` is `d/dx (e)`; at another point, evaluated with a bar. -/
+partial def renderDeriv (f x : Expr) : LatexM (Option Tex) := do
+  if !f.isLambda then
+    let fT ← render f
+    let xT ← render x
+    return some { s := s!"{fT.paren maxPrec}'\\left({xT.s}\\right)", prec := maxPrec }
+  let xT ← render x
+  some <$> withFunBody f `x fun v body => do
+    let b ← render body
+    let d := s!"\\frac\{d}\{d{v}}\\left({b.s}\\right)"
+    if xT.s == v then return atom d
+    return atom s!"\\left.{d}\\right|_\{{v} = {xT.s}}"
+
+/-- `∫_a^b f x dx` (interval) or `∫_s f x dx` (restricted measure) or `∫ f x dx`. -/
+partial def renderIntegral (f : Expr) (bounds? : Option (Expr × Expr)) (dom? : Option Expr) :
+    LatexM (Option Tex) := do
+  let limits ← match bounds?, dom? with
+    | some (a, b), _ => pure s!"_\{{(← render a).s}}^\{{(← render b).s}}"
+    | none, some s => pure s!"_\{{(← render s).s}}"
+    | none, none => pure ""
+  some <$> withFunBody f `x fun v body => do
+    let b ← render body
+    return { s := s!"\\int{limits} {b.paren 66} \\, d{v}", prec := 67 }
+
+/-- `Tendsto f atTop (nhds l)` is `lim_{x → ∞} f x = l`; other filters are not handled. -/
+partial def renderLimit (α f l₁ l₂ : Expr) : LatexM (Option Tex) := do
+  let target? (l : Expr) : LatexM (Option String) := do
+    if l.isAppOfArity `Filter.atTop 2 then return some "\\infty"
+    if l.isAppOfArity `nhds 3 then return some (← render l.appArg!).s
+    return none
+  let some src ← target? l₁ | return none
+  let some dst ← target? l₂ | return none
+  let dflt := if α.isConstOf ``Nat then `n else `x
+  some <$> withFunBody f dflt fun v body => do
+    let b ← render body
+    return { s := s!"\\lim_\{{v} \\to {src}} {b.s} = {dst}", prec := 50 }
+
+/-- `{x ∈ T | p x}` (set-builder notation). -/
+partial def renderSetOf (α p : Expr) : LatexM (Option Tex) := do
+  let .lam n t b bi := p | return none
+  withLocalDecl (binderName n) bi t fun x => do
+    let name ← fvarLatex x.fvarId!
+    let body ← render (b.instantiate1 x)
+    let αT ← render α
+    let ty := if isSetLike α then s!" \\in {αT.s}" else ""
+    return some (atom s!"\\left\\\{ {name}{ty} \\mid {body.s} \\right\\}")
+
 /-- `∃ x, p x`, with bounded form `∃ x > 0, q` for `∃ x, x > 0 ∧ q`. -/
-partial def renderExists (p : Expr) : LatexM (Option Tex) := do
+partial def renderExists (q : String) (p : Expr) : LatexM (Option Tex) := do
   let .lam n t b bi := p | return none
   withLocalDecl (binderName n) bi t fun x => do
     let body := b.instantiate1 x
@@ -303,11 +391,11 @@ partial def renderExists (p : Expr) : LatexM (Option Tex) := do
       if let some (op, rhs) := binderPred? x l then
         let rhsT ← render rhs
         let rest ← render r
-        return some { s := s!"\\exists {name} {op} {rhsT.s},\\ {rest.s}", prec := 0 }
+        return some { s := s!"{q} {name} {op} {rhsT.s},\\ {rest.s}", prec := 0 }
     let tT ← render t
     let rest ← render body
     let ty := if isSetLike t then s!" \\in {tT.s}" else ""
-    return some { s := s!"\\exists {name}{ty},\\ {rest.s}", prec := 0 }
+    return some { s := s!"{q} {name}{ty},\\ {rest.s}", prec := 0 }
 
 /-- `∑ i ∈ s, f i`; `Finset.range n` prints as `\sum_{i=0}^{n-1}`. -/
 partial def renderBigOp (op : String) (s f : Expr) : LatexM (Option Tex) := do

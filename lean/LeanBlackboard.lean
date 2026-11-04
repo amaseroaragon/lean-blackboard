@@ -1,4 +1,5 @@
 import LeanBlackboard.Latex
+import LeanBlackboard.DefaultRules
 import LeanBlackboard.Command
 import LeanBlackboard.Rpc
 
