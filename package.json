@@ -1,6 +1,7 @@
 {
   "name": "lean-blackboard-monorepo",
   "private": true,
+  "license": "MIT",
   "workspaces": [
     "packages/core",
     "packages/webview",

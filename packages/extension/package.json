@@ -5,7 +5,11 @@
   "version": "0.3.0",
   "private": true,
   "publisher": "amaseroaragon",
-  "license": "UNLICENSED",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amaseroaragon/lean-blackboard"
+  },
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -189,7 +193,7 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "package": "vsce package --no-dependencies --skip-license --allow-missing-repository -o ../../lean-blackboard.vsix",
+    "package": "vsce package --no-dependencies --skip-license -o ../../lean-blackboard.vsix",
     "build:test": "node esbuild.integration.mjs",
     "test:integration": "node esbuild.integration.mjs && node dist-test/runTest.js"
   },

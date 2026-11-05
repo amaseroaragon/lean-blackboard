@@ -7,4 +7,5 @@ Muestra las hipótesis y objetivos de Lean 4 en la posición del cursor con nota
 - Modo rápido (sin configuración) y modo preciso con el paquete Lean `LeanBlackboard`.
 - Conmutador matemáticas/Lean, copiar LaTeX, reglas y macros propias.
 
-Documentación en el repositorio: `docs/configuracion.md` y `docs/modo-preciso.md`.
+Documentación: <https://github.com/amaseroaragon/lean-blackboard> (ver `docs/configuracion.md` y
+`docs/modo-preciso.md`). Licencia MIT.

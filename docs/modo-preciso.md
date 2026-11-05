@@ -27,8 +27,20 @@ modos; las de operadores (`infix`, `prefix`…) solo en el rápido. Las macros s
 
 ## Cómo activarlo en un proyecto
 
-1. Añade la dependencia en el `lakefile.toml` del proyecto (ruta local, porque el proyecto no está
-   publicado):
+1. Añade la dependencia en el `lakefile.toml` del proyecto, desde GitHub:
+
+   ```toml
+   [[require]]
+   name = "LeanBlackboard"
+   git = "https://github.com/amaseroaragon/lean-blackboard"
+   rev = "main"
+   subDir = "lean"
+   ```
+
+   Con `lakefile.lean`:
+   `require LeanBlackboard from git "https://github.com/amaseroaragon/lean-blackboard" @ "main" / "lean"`.
+
+   O desde una copia local del repositorio:
 
    ```toml
    [[require]]
@@ -43,8 +55,9 @@ modos; las de operadores (`infix`, `prefix`…) solo en el rápido. Las macros s
    existe en ficheros que lo importan (directa o indirectamente).
 4. Reinicia el fichero en VS Code (`Lean 4: Restart File`) si ya estaba abierto.
 
-El toolchain del paquete debe coincidir con el del proyecto. Ahora mismo es
-`leanprover/lean4:v4.34.1`.
+El paquete está probado con `leanprover/lean4:v4.34.1` (y Mathlib `v4.34.1`). Lake lo compila con
+el toolchain de tu proyecto, así que con otras versiones de Lean puede no compilar; en ese caso
+queda el modo rápido.
 
 El panel muestra una etiqueta `precise` o `fast` junto a la posición. Si el paquete no está
 importado, la extensión vuelve al modo rápido sola y lo vuelve a intentar al guardar el fichero o
