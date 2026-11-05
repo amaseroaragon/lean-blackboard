@@ -4,9 +4,9 @@ Extensión de VS Code que muestra las hipótesis y objetivos de Lean 4 en la pos
 notación matemática renderizada (KaTeX), en un panel propio, junto a la extensión oficial de Lean 4
 (`leanprover.lean4`) y **sin modificarla**.
 
-Proyecto personal, con el código público en GitHub (`amaseroaragon/lean-blackboard`, licencia MIT).
-De momento **no** se publica en el Marketplace ni en Open VSX: se instala desde el código con
-`npm run package` (ver `README.md`).
+Código público en GitHub (`amaseroaragon/lean-blackboard`, licencia MIT). De momento **no** se
+publica en el Marketplace ni en Open VSX: se instala desde el código con `npm run package` (ver
+`README.md`).
 
 Como el repositorio es público: nada de secretos, tokens ni rutas o datos personales (por ejemplo
 rutas de `/home/...` o nombres de proyectos ajenos) en el código, la documentación, los tests ni
@@ -26,8 +26,11 @@ los mensajes de commit.
 ## Convenciones
 
 - TypeScript en modo `strict`. Bundle con esbuild.
-- Código, identificadores y comentarios en inglés. Documentación del repo en español
-  (`README.md` y `docs/`; mantener el README al día cuando cambien la instalación o las funciones).
+- Código, identificadores y comentarios en inglés.
+- Documentación del repo **bilingüe**, inglés y español, siempre con el mismo contenido:
+  `README.md` / `README.es.md` y `docs/en/` / `docs/es/` (cada página enlaza a su traducción).
+  Al cambiar una, cambiar la otra. El README es corto (descripción, instalación, enlaces): el
+  detalle va en `docs/`. Mantenerlo al día cuando cambie la instalación.
 - Tests de lógica pura con vitest; tests de integración con VS Code real (`npm run test:integration`).
 - Gestor de paquetes: npm (workspaces cuando haya más de un paquete).
 
@@ -66,7 +69,7 @@ Principios:
 
 Verificado sobre `leanprover/vscode-lean4` v0.0.241 y `leanprover/lean4` master, y de nuevo sobre
 v0.0.240 (la instalada) y Lean v4.34.1: la API que usamos es idéntica. Detalles y respuestas reales
-en `docs/spike-findings.md`.
+en `docs/es/spike-findings.md`.
 
 **Acceso**
 - `vscode.extensions.getExtension('leanprover.lean4')`. Si no está activa, `await ext.activate()`.
@@ -151,7 +154,7 @@ Criterios de aceptación (los comprueba el usuario a mano con F5 en el Extension
 5. Abrir VS Code sin ningún fichero Lean no produce errores. La extensión espera.
 6. La InfoView oficial sigue funcionando igual.
 
-Entregable adicional: una nota en `docs/spike-findings.md` con lo observado (formas reales de las
+Entregable adicional: una nota en `docs/es/spike-findings.md` con lo observado (formas reales de las
 respuestas, latencias, sorpresas) y las correcciones que haya que hacer a este documento.
 
 ### Fase 1: Panel con texto plano (cerrada 2026-11-04)
@@ -179,7 +182,7 @@ Debe resolver lo que el modo rápido no puede saber sin tipos:
 
 Decisiones (2026-11-04): printer propio solo con Lean core (LeanTeX descartado: anclado a
 v4.18.0-rc1, sin mantenimiento y con ProofWidgets); las reglas `functions`/`symbols` del cliente se
-envían en cada petición y se aplican también aquí. Detalles de uso en `docs/modo-preciso.md`.
+envían en cada petición y se aplican también aquí. Detalles de uso en `docs/es/modo-preciso.md`.
 
 ### Mejoras posteriores (2026-11-04)
 `.vsix` local, objetivos en modo término, Mathlib (proyecto de ejemplo, reglas y golden reales),

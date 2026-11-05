@@ -1,5 +1,7 @@
 # Configuración
 
+[English](../en/configuration.md) · **Español**
+
 ## Notación matemática / Lean
 
 - **Global**: botón en la barra de título del panel Goals, o el comando

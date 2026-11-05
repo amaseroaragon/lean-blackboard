@@ -1,5 +1,7 @@
 # Modo preciso
 
+[English](../en/precise-mode.md) · **Español**
+
 El modo rápido convierte el **texto** que imprime Lean, así que no conoce los tipos. El modo
 preciso usa el paquete Lean compañero `LeanBlackboard` (en `lean/`), que recorre el `Expr` real
 en el servidor de Lean y devuelve LaTeX. Lo que cambia:

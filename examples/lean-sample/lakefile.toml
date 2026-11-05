@@ -1,7 +1,7 @@
 name = "lean-sample"
 defaultTargets = ["LeanSample", "FastSample"]
 
-# Companion package for precise mode (local path; see docs/modo-preciso.md).
+# Companion package for precise mode (local path; see docs/en/precise-mode.md).
 [[require]]
 name = "LeanBlackboard"
 path = "../../lean"

@@ -1,11 +1,10 @@
 # Lean Blackboard
 
-Muestra las hipótesis y objetivos de Lean 4 en la posición del cursor con notación matemática
-(KaTeX), en un panel propio junto a la extensión oficial de Lean 4.
+Shows Lean 4 hypotheses and goals at the cursor with rendered math notation (KaTeX), in its own
+panel next to the official Lean 4 extension.
 
-- Panel **Goals** en la barra de actividad (icono de pizarra).
-- Modo rápido (sin configuración) y modo preciso con el paquete Lean `LeanBlackboard`.
-- Conmutador matemáticas/Lean, copiar LaTeX, reglas y macros propias.
+- **Goals** panel in the activity bar (blackboard icon).
+- Fast mode (no setup) and precise mode with the `LeanBlackboard` Lean package.
+- Math/Lean toggle, copy as LaTeX, custom rules and macros.
 
-Documentación: <https://github.com/amaseroaragon/lean-blackboard> (ver `docs/configuracion.md` y
-`docs/modo-preciso.md`). Licencia MIT.
+Documentation (English and Spanish): <https://github.com/amaseroaragon/lean-blackboard>. MIT license.

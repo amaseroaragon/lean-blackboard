@@ -1,5 +1,7 @@
 # Fase 0: hallazgos del spike
 
+[English](../en/spike-findings.md) · **Español**
+
 Fecha: 2026-11-04. Entorno: VS Code 1.144.0, `leanprover.lean4` **v0.0.240** (CLAUDE.md se
 verificó contra v0.0.241), Lean `v4.34.1`, Node 22.
 
