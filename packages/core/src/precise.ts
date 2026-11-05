@@ -9,6 +9,27 @@ export const PRECISE_METHOD = 'LeanBlackboard.getGoalsLatex';
 export const PRECISE_EXPRS_METHOD = 'LeanBlackboard.exprsLatex';
 export const PRECISE_PROTOCOL_VERSION = 4;
 
+/** Lake package name of the companion package (`lean/lakefile.toml`). */
+export const COMPANION_PACKAGE = 'LeanBlackboard';
+
+const lakeName = (n: unknown): string | undefined =>
+  typeof n === 'string' ? n.replace(/^«(.*)»$/, '$1') : undefined;
+
+/**
+ * Whether a Lake project (given its parsed `lake-manifest.json`) can import the companion
+ * package: it is the package itself or one of its (transitive, resolved) dependencies.
+ * If not, precise mode can never be available there, so the extension must not even probe it:
+ * asking Lean for an unknown user RPC method makes it scan every snapshot of the file, which
+ * while elaborating logs "`Task.get` called from a `(sync := true)` task" (a Lean core issue).
+ */
+export function manifestHasCompanion(manifest: unknown): boolean {
+  if (typeof manifest !== 'object' || manifest === null) return false;
+  const m = manifest as { name?: unknown; packages?: unknown };
+  if (lakeName(m.name) === COMPANION_PACKAGE) return true;
+  return Array.isArray(m.packages) && m.packages.some((p: unknown) =>
+    typeof p === 'object' && p !== null && lakeName((p as { name?: unknown }).name) === COMPANION_PACKAGE);
+}
+
 /** `Rules` in the shape the Lean side expects (only `symbols` and `functions` apply there). */
 export interface WireRules {
   symbols: { name: string; latex: string }[];

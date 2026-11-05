@@ -16,6 +16,8 @@ export type { MacrosResult } from './rules/macros';
 export { flattenTaggedText } from './taggedText';
 export type { CodeWithInfos, TaggedText } from './taggedText';
 export {
+  COMPANION_PACKAGE,
+  manifestHasCompanion,
   PRECISE_EXPRS_METHOD,
   PRECISE_METHOD,
   PRECISE_PROTOCOL_VERSION,

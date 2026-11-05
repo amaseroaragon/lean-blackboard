@@ -50,6 +50,14 @@ El panel muestra una etiqueta `precise` o `fast` junto a la posición. Si el paq
 importado, la extensión vuelve al modo rápido sola y lo vuelve a intentar al guardar el fichero o
 pasados 30 s.
 
+Si el `lake-manifest.json` del proyecto no incluye el paquete `LeanBlackboard` (o no existe), la
+extensión ni siquiera llama a sus métodos RPC. Para un método de usuario desconocido, Lean recorre
+todos los snapshots del fichero antes de responder "method not found". Mientras el fichero se
+elabora, ese recorrido escribe en el log del servidor
+`` `Task.get` called from a `(sync := true)` task `` (es un problema de Lean core:
+`AsyncList.waitFind?` evalúa la búsqueda en continuaciones `sync`). El manifest se vuelve a leer
+cuando cambia, así que basta con `lake update`.
+
 Para forzar el modo rápido: `"leanBlackboard.mode": "fast"`.
 
 ## Probar el printer sin VS Code

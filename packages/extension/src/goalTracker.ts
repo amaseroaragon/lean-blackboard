@@ -1,8 +1,11 @@
 // Follows the cursor in Lean editors and feeds the goals panel.
 // Debounces updates, cancels the previous in-flight request and drops stale results.
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import {
+  manifestHasCompanion,
   PRECISE_EXPRS_METHOD,
   PRECISE_METHOD,
   PRECISE_PROTOCOL_VERSION,
@@ -33,6 +36,8 @@ export class GoalTracker implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   /** Files where the companion package is not available → time of the last check. */
   private readonly noPrecise = new Map<string, number>();
+  /** Lake project folder → whether its manifest has the companion package (by manifest mtime). */
+  private readonly companion = new Map<string, { mtimeMs: number; has: boolean }>();
 
   constructor(
     private readonly bridge: LeanBridge,
@@ -199,7 +204,10 @@ export class GoalTracker implements vscode.Disposable {
         const { messages, exprRefs } = interactiveDiagnosticsToView(result, rules);
         const wanted = exprRefs.map((r, i) => ({ r, i })).filter((x) => x.r !== undefined);
         const checked = this.noPrecise.get(uri.toString());
-        const preciseOk = this.settings.mode !== 'fast' && (checked === undefined || Date.now() - checked >= PRECISE_RETRY_MS);
+        const preciseOk =
+          this.settings.mode !== 'fast' &&
+          this.companionAvailable(uri) &&
+          (checked === undefined || Date.now() - checked >= PRECISE_RETRY_MS);
         if (preciseOk && wanted.length > 0) {
           try {
             const res = (await this.bridge.exprsLatex(
@@ -240,7 +248,7 @@ export class GoalTracker implements vscode.Disposable {
     position: Position,
     token: vscode.CancellationToken,
   ): Promise<PreciseView | undefined> {
-    if (this.settings.mode === 'fast') return undefined;
+    if (this.settings.mode === 'fast' || !this.companionAvailable(uri)) return undefined;
     const key = uri.toString();
     const checked = this.noPrecise.get(key);
     if (checked !== undefined && Date.now() - checked < PRECISE_RETRY_MS) return undefined;
@@ -261,6 +269,39 @@ export class GoalTracker implements vscode.Disposable {
       this.noPrecise.set(key, Date.now());
       return undefined;
     }
+  }
+
+  /**
+   * Whether the document's Lake project has the companion package. If not, user RPC methods are
+   * never called: Lean answers "method not found" only after scanning every snapshot of the file,
+   * and while it elaborates that scan logs "`Task.get` called from a `(sync := true)` task"
+   * (Lean core: `AsyncList.waitFind?` runs the lookup in `sync` continuations).
+   */
+  private companionAvailable(uri: vscode.Uri): boolean {
+    const folder = this.bridge.projectFolder(uri);
+    if (folder === undefined) return false;
+    const file = path.join(folder, 'lake-manifest.json');
+    let mtimeMs: number;
+    try {
+      mtimeMs = fs.statSync(file).mtimeMs;
+    } catch {
+      mtimeMs = -1; // No manifest: no resolved dependencies.
+    }
+    const cached = this.companion.get(folder);
+    if (cached?.mtimeMs === mtimeMs) return cached.has;
+    let has = false;
+    if (mtimeMs >= 0) {
+      try {
+        has = manifestHasCompanion(JSON.parse(fs.readFileSync(file, 'utf8')));
+      } catch (e) {
+        this.log.warn(`Cannot read ${file}: ${describeError(e)}`);
+      }
+    }
+    this.companion.set(folder, { mtimeMs, has });
+    if (!has && this.settings.mode !== 'fast') {
+      this.log.info(`Precise mode not available in ${folder} (no LeanBlackboard package in lake-manifest.json); using fast mode.`);
+    }
+    return has;
   }
 
   private startRequest(): vscode.CancellationTokenSource {

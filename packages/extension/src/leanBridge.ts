@@ -194,6 +194,12 @@ export class LeanBridge implements vscode.Disposable {
     return best ?? this.provider.getActiveClient();
   }
 
+  /** Root folder of the Lake project of the document's client; `undefined` for ad-hoc clients. */
+  projectFolder(uri: vscode.Uri): string | undefined {
+    const folder = this.clientFor(uri)?.getClientFolder();
+    return folder?.scheme === 'file' ? folder.fsPath : undefined;
+  }
+
   // -------------------------------------------------------------------------
   // Requests
   // -------------------------------------------------------------------------
