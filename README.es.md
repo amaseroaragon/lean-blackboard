@@ -6,7 +6,7 @@ Extensión de VS Code que muestra las hipótesis y objetivos de Lean 4 en la pos
 notación matemática renderizada (KaTeX), en un panel propio junto a la extensión oficial de Lean 4.
 Reutiliza el servidor de Lean de la extensión oficial: sin procesos extra y sin configuración.
 
-$$\forall \varepsilon > 0,\ \exists \delta > 0,\ \forall x \in \mathbb{R},\ \left|x - a\right| < \delta \to \left|f\left(x\right) - f\left(a\right)\right| < \varepsilon$$
+![Lean Blackboard](docs/images/panel.png)
 
 ## Instalación
 
@@ -36,14 +36,8 @@ rev = "main"
 subDir = "lean"
 ```
 
-Después ejecuta `lake update LeanBlackboard && lake build` y añade `import LeanBlackboard` en tus ficheros. Ver
-[docs/es/modo-preciso.md](docs/es/modo-preciso.md).
-
-## Documentación
-
-- [Configuración](docs/es/configuracion.md): funciones del panel, reglas propias y macros.
-- [Modo preciso](docs/es/modo-preciso.md).
+Después ejecuta `lake update LeanBlackboard && lake build` y añade `import LeanBlackboard` en tus ficheros.
 
 ## Licencia
 
-[MIT](LICENSE).
+Este proyecto está distribuido bajo la licencia MIT. Consulta el archivo [LICENSE](LICENSE) para más información.

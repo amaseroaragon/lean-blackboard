@@ -6,7 +6,7 @@ A VS Code extension that shows Lean 4 hypotheses and goals at the cursor with re
 notation (KaTeX), in its own panel next to the official Lean 4 extension. It reuses the official
 extension's Lean server: no extra process, nothing to configure.
 
-$$\forall \varepsilon > 0,\ \exists \delta > 0,\ \forall x \in \mathbb{R},\ \left|x - a\right| < \delta \to \left|f\left(x\right) - f\left(a\right)\right| < \varepsilon$$
+![Lean Blackboard](docs/images/panel.png)
 
 ## Installation
 
@@ -36,14 +36,8 @@ rev = "main"
 subDir = "lean"
 ```
 
-Then run `lake update LeanBlackboard && lake build` and add `import LeanBlackboard` to your files. See
-[docs/en/precise-mode.md](docs/en/precise-mode.md).
-
-## Documentation
-
-- [Configuration](docs/en/configuration.md): panel features, custom rules and macros.
-- [Precise mode](docs/en/precise-mode.md).
+Then run `lake update LeanBlackboard && lake build` and add `import LeanBlackboard` to your files.
 
 ## License
 
-[MIT](LICENSE).
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
