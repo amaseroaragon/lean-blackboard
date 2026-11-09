@@ -10,6 +10,8 @@ import {
   PRECISE_METHOD,
   PRECISE_PROTOCOL_VERSION,
   applyPreciseExprs,
+  findSourceDeclaration,
+  sourceDeclarationToView,
   interactiveDiagnosticsToView,
   PreciseProtocolError,
   interactiveGoalsToView,
@@ -146,22 +148,42 @@ export class GoalTracker implements vscode.Disposable {
           this.log.debug(`${what} failed: ${describeError(e)}`);
           return null;
         });
-      const [res, termRes, beforeRes, messages] = await Promise.all([
+      // The declaration at the cursor, read from the source; Lean gives its type (the expected
+      // type at the name).
+      const decl = findSourceDeclaration({ lineCount: doc.lineCount, lineAt: (i) => doc.lineAt(i).text }, pos.line);
+      const [res, termRes, beforeRes, messages, signatureRes] = await Promise.all([
         this.bridge.interactiveGoals(doc.uri, position, token),
         bonus(this.bridge.interactiveTermGoal(doc.uri, position, token), 'getInteractiveTermGoal'),
         hasBefore
           ? bonus(this.bridge.interactiveGoals(doc.uri, { line: pos.line, character: indent }, token), 'goals before')
           : Promise.resolve(null),
         messagesP,
+        decl
+          ? bonus(
+              this.bridge.interactiveTermGoal(doc.uri, { line: decl.nameLine, character: decl.nameCharacter }, token),
+              'declaration type',
+            )
+          : Promise.resolve(null),
       ]);
       if (token.isCancellationRequested) return;
       this.log.debug(`getInteractiveGoals ${location} (${ms(t0)})`);
+      let definitions;
+      if (decl) {
+        let signature;
+        try {
+          signature = interactiveTermGoalToView(signatureRes, this.settings.rules);
+        } catch (e) {
+          this.log.debug(`declaration type: ${describeError(e)}`);
+        }
+        definitions = [sourceDeclarationToView(decl, signature, this.settings.rules)];
+      }
       this.panel.setState({
         kind: 'goals',
         location,
         goals: interactiveGoalsToView(res, this.settings.rules),
         termGoal: interactiveTermGoalToView(termRes, this.settings.rules),
         goalsBefore: interactiveGoalsToView(beforeRes, this.settings.rules) ?? undefined,
+        definitions,
         messages,
         mode: 'fast',
       });

@@ -123,6 +123,15 @@ test('structure fields and inductive constructors (precise mode)', async () => {
   assert.deepEqual(ind.definitions?.[0]?.members.map((m) => m.name), ['leaf', 'node']);
 });
 
+test('definitions in fast mode (source equations, Lean type)', async () => {
+  await openAt('FastSample.lean', '| n + 1 => double n + 2');
+  const s = await waitFor('fast definition', goalsWhere((s) => s.mode === 'fast' && s.definitions?.[0]?.name === 'double'));
+  const def = s.definitions?.[0];
+  assert.equal(def?.type, 'Nat → Nat');
+  assert.deepEqual(def?.equations.map((e) => e.lean), ['double 0 = 0', 'double (n + 1) = double n + 2']);
+  assert.match(def?.equations[1]?.latex ?? '', /\\operatorname\{double\}\\left\(n \+ 1\\right\)/);
+});
+
 test('Before/After with changed subterms (precise mode)', async () => {
   const editor = await openAt('LeanSample.lean', 'rw [Nat.mul_comm]');
   const line = editor.selection.active.line;

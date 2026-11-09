@@ -52,7 +52,10 @@ Una `structure` muestra sus campos (*lo : ℤ*, *hi : ℤ*, *valid : lo ≤ hi*)
 sus constructores (*leaf : Tree*, *node : Tree → ℕ → Tree → Tree*). No se muestran instancias, las
 funciones que genera Lean (proyecciones, recursores…) ni teoremas.
 
-Solo en modo preciso: el modo rápido no tiene la definición elaborada.
+El modo rápido también muestra la sección, con menos precisión: el tipo lo da Lean, pero las
+ecuaciones, los campos y los constructores se leen del texto fuente, así que entiende las formas
+habituales (`:= cuerpo`, casos `| patrón => …`, `match` sobre parámetros, campos `nombre : tipo`) y
+no da condiciones laterales. Los cuerpos con tácticas (`:= by …`) no tienen ecuaciones.
 
 ## Cómo activarlo en un proyecto
 

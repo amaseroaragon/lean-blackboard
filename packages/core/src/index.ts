@@ -26,6 +26,8 @@ export {
   rulesToWire,
 } from './precise';
 export type { PreciseView, WireRules } from './precise';
+export { findSourceDeclaration, sourceDeclarationToView } from './declaration';
+export type { SourceDeclaration, SourceLines } from './declaration';
 export { definitionToLatexArray, definitionsToLatexDocument, goalToLatexArray, goalsToLatexDocument } from './export';
 export { breakLatex, breakToFit, splitTopLevel } from './render/break';
 export { stripMarkers } from './render/markers';

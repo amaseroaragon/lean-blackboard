@@ -52,7 +52,10 @@ A `structure` shows its fields (*lo : ℤ*, *hi : ℤ*, *valid : lo ≤ hi*) and
 constructors (*leaf : Tree*, *node : Tree → ℕ → Tree → Tree*). Instances, the functions Lean
 generates (projections, recursors…) and theorems are not shown.
 
-Only in precise mode: fast mode does not have the elaborated definition.
+Fast mode shows the section too, with less precision: the type comes from Lean, but the equations,
+fields and constructors are read from the source text, so it handles the usual shapes (`:= body`,
+`| pattern => …` cases, `match` on parameters, `name : type` fields) and gives no side conditions.
+Tactic bodies (`:= by …`) have no equations.
 
 ## Enabling it in a project
 
