@@ -5,6 +5,7 @@ import * as assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import { readFileSync, readlinkSync } from 'node:fs';
 import * as vscode from 'vscode';
+import { stripMarkers } from '@lean-blackboard/core';
 import type { PanelState } from '@lean-blackboard/core';
 import type { LeanBlackboardApi } from '../../src/extension';
 
@@ -99,6 +100,17 @@ test('expected type in term mode', async () => {
   await openAt('LeanSample.lean', 'h (by decide)', 'needle');
   const s = await waitFor('term goal', goalsWhere((s) => s.termGoal !== undefined));
   assert.equal(s.termGoal?.kind === 'structured' && s.termGoal.typeLatex.includes('<'), true);
+});
+
+test('definitions: signature and equations (precise mode)', async () => {
+  await openAt('LeanSample.lean', '| n + 1 => (n + 1) * factorial n');
+  const s = await waitFor('definition', goalsWhere((s) => s.mode === 'precise' && (s.definitions?.length ?? 0) > 0));
+  const def = s.definitions?.[0];
+  assert.equal(def?.name, 'factorial');
+  assert.match(stripMarkers(def?.typeLatex ?? ''), /\\mathbb\{N\} \\to \\mathbb\{N\}/);
+  assert.equal(def?.equations.length, 2);
+  assert.match(stripMarkers(def?.equations[1]?.latex ?? ''), /\\cdot/);
+  assert.equal(s.goals, null);
 });
 
 test('Before/After with changed subterms (precise mode)', async () => {

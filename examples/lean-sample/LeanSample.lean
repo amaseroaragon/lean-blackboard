@@ -37,3 +37,10 @@ theorem term_mode (n : Nat) (h : n < 5) : n < 10 :=
 theorem rw_demo (a b c : Nat) (h : a * b = c) : b * a = c := by
   rw [Nat.mul_comm]
   exact h
+
+-- Definitions: put the cursor anywhere in a `def` to see its signature and equations.
+def square (x : Nat) : Nat := x ^ 2 + 1
+
+def factorial : Nat → Nat
+  | 0 => 1
+  | n + 1 => (n + 1) * factorial n

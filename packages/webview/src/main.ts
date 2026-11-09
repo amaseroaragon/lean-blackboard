@@ -3,6 +3,7 @@
 // `'unsafe-inline'`.
 
 import type {
+  DefinitionView,
   GoalView,
   HostMessage,
   HypView,
@@ -13,7 +14,7 @@ import type {
   ViewConfig,
   WebviewMessage,
 } from '@lean-blackboard/core';
-import { breakToFit, goalsToLatexDocument, stripMarkers } from '@lean-blackboard/core';
+import { breakToFit, definitionsToLatexDocument, goalsToLatexDocument, stripMarkers } from '@lean-blackboard/core';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 import './panel.css';
@@ -280,11 +281,16 @@ function renderState(state: PanelState): Node[] {
   }
 }
 
-/** Goals, "no goals" messages and expected type; `keyPrefix` keeps row keys unique per section. */
+/**
+ * Definitions, goals, "no goals" messages and expected type; `keyPrefix` keeps row keys unique
+ * per section.
+ */
 function renderGoalsBody(state: GoalsState, keyPrefix: string): Node[] {
   const nodes: Node[] = [];
+  const defs = state.definitions ?? [];
+  if (defs.length > 0) nodes.push(...renderDefinitions(defs, keyPrefix));
   if (state.goals === null) {
-    if (!state.termGoal) nodes.push(message('No tactic state at the cursor.'));
+    if (!state.termGoal && defs.length === 0) nodes.push(message('No tactic state at the cursor.'));
   } else if (state.goals.length === 0) {
     nodes.push(message('No goals.', 'message success'));
   } else {
@@ -304,6 +310,25 @@ function renderGoalsBody(state: GoalsState, keyPrefix: string): Node[] {
     nodes.push(el('h2', 'count', 'Expected type'));
     nodes.push(renderGoal(termGoal, `${keyPrefix}term`));
   }
+  return nodes;
+}
+
+/** The `def`s of the command at the cursor: signature, then one row per defining equation. */
+function renderDefinitions(defs: DefinitionView[], keyPrefix: string): Node[] {
+  const copy = button('Copy', 'Copy the definition as LaTeX', () =>
+    vscode.postMessage({ type: 'copy', text: definitionsToLatexDocument(defs) }),
+  );
+  const title = defs.length === 1 ? 'Definition' : `Definitions (${defs.length})`;
+  const nodes: Node[] = [el('div', 'heading', el('h2', 'count', title), copy)];
+  defs.forEach((d, i) => {
+    const key = `${keyPrefix}d${i}:${d.name}`;
+    const section = el('section', 'goal definition');
+    section.append(
+      renderRow({ key: `${key}:sig`, latex: `${d.nameLatex} : ${d.typeLatex}`, lean: `${d.name} : ${d.type}`, className: 'signature' }),
+      ...d.equations.map((e, j) => renderRow({ key: `${key}:eq${j}`, latex: e.latex, lean: e.lean, className: 'equation' })),
+    );
+    nodes.push(section);
+  });
   return nodes;
 }
 

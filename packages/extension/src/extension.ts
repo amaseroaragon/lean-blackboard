@@ -35,7 +35,7 @@ export function activate(context: vscode.ExtensionContext): LeanBlackboardApi {
         void vscode.window.showInformationMessage('Lean Blackboard: no goals to copy.');
         return;
       }
-      await vscode.env.clipboard.writeText(goalsToLatexDocument(state.goals, state.termGoal));
+      await vscode.env.clipboard.writeText(goalsToLatexDocument(state.goals, state.termGoal, state.definitions));
       vscode.window.setStatusBarMessage('Lean Blackboard: goal state copied as LaTeX', 2000);
     }),
     vscode.commands.registerCommand('leanBlackboard.pinGoalState', () => panel.pin()),

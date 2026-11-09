@@ -1,6 +1,6 @@
 // Whole goal state as a LaTeX block, for pasting into notes or papers.
 
-import type { GoalView } from './protocol';
+import type { DefinitionView, GoalView } from './protocol';
 import { texttt } from './render/latex';
 import { stripMarkers } from './render/markers';
 
@@ -23,9 +23,23 @@ export function goalToLatexArray(goal: GoalView): string {
   return stripMarkers(`\\begin{array}{l}\n${body}\n\\end{array}`);
 }
 
-/** All goals (and the expected type, if any) as display-math blocks separated by blank lines. */
-export function goalsToLatexDocument(goals: GoalView[] | null, termGoal?: GoalView): string {
-  const blocks: string[] = [];
+/** A definition as one `array`: signature, then one equation per row. */
+export function definitionToLatexArray(def: DefinitionView): string {
+  const rows = [`${def.nameLatex} : ${def.typeLatex}`, ...def.equations.map((e) => e.latex)];
+  return stripMarkers(`\\begin{array}{l}\n${rows.join(' \\\\\n')}\n\\end{array}`);
+}
+
+/** Definitions as display-math blocks separated by blank lines. */
+export function definitionsToLatexDocument(defs: DefinitionView[]): string {
+  return `${defs.map((d) => `% Definition ${d.name}\n\\[\n${definitionToLatexArray(d)}\n\\]`).join('\n\n')}\n`;
+}
+
+/**
+ * All goals (and the definitions and expected type, if any) as display-math blocks separated by
+ * blank lines.
+ */
+export function goalsToLatexDocument(goals: GoalView[] | null, termGoal?: GoalView, definitions: DefinitionView[] = []): string {
+  const blocks: string[] = definitions.map((d) => definitionsToLatexDocument([d]).trimEnd());
   (goals ?? []).forEach((g, i) => {
     const label = g.kind === 'structured' && g.userName ? ` (case ${g.userName})` : '';
     blocks.push(`% Goal ${i + 1}${label}\n\\[\n${goalToLatexArray(g)}\n\\]`);

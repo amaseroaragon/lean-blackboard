@@ -1,13 +1,13 @@
 // Precise mode: wire format of the companion Lean package's RPC method
 // `LeanBlackboard.getGoalsLatex` (see `lean/LeanBlackboard/Rpc.lean`).
 
-import type { GoalView, HypView, SubexprView } from './protocol';
+import type { DefinitionView, GoalView, HypView, SubexprView } from './protocol';
 import { identToLatex } from './render/ident';
 import type { Rules } from './rules/types';
 
 export const PRECISE_METHOD = 'LeanBlackboard.getGoalsLatex';
 export const PRECISE_EXPRS_METHOD = 'LeanBlackboard.exprsLatex';
-export const PRECISE_PROTOCOL_VERSION = 4;
+export const PRECISE_PROTOCOL_VERSION = 5;
 
 /** Lake package name of the companion package (`lean/lakefile.toml`). */
 export const COMPANION_PACKAGE = 'LeanBlackboard';
@@ -70,6 +70,7 @@ export interface PreciseView {
   termGoal?: GoalView;
   subexprs?: SubexprView[];
   goalsBefore?: GoalView[];
+  definitions?: DefinitionView[];
 }
 
 /** Converts a `getGoalsLatex` response. Throws `PreciseProtocolError` on a version/shape mismatch. */
@@ -91,8 +92,38 @@ export function preciseGoalsToView(res: unknown, rules: Rules): PreciseView {
     'goalsBefore' in res && Array.isArray(res.goalsBefore)
       ? (res.goalsBefore as WireGoal[]).map((g) => goalToView(g, rules))
       : undefined;
-  // Lean answers `goals: []` when it only has an expected type: that is "no tactic state".
-  return { goals: goals.length === 0 && termGoal ? null : goals, termGoal, subexprs, goalsBefore };
+  const definitions =
+    'definitions' in res && Array.isArray(res.definitions) && res.definitions.length > 0
+      ? (res.definitions as unknown[]).filter(isWireDefinition).map(definitionToView)
+      : undefined;
+  // Lean answers `goals: []` when it only has an expected type or definitions: that is
+  // "no tactic state".
+  const noTacticState = goals.length === 0 && (termGoal !== undefined || definitions !== undefined);
+  return { goals: noTacticState ? null : goals, termGoal, subexprs, goalsBefore, definitions };
+}
+
+function isWireDefinition(d: unknown): d is DefinitionView {
+  if (typeof d !== 'object' || d === null) return false;
+  const x = d as Record<string, unknown>;
+  return (
+    typeof x.name === 'string' &&
+    typeof x.nameLatex === 'string' &&
+    typeof x.type === 'string' &&
+    typeof x.typeLatex === 'string' &&
+    Array.isArray(x.equations)
+  );
+}
+
+function definitionToView(d: DefinitionView): DefinitionView {
+  return {
+    name: d.name,
+    nameLatex: d.nameLatex,
+    type: d.type,
+    typeLatex: d.typeLatex,
+    equations: d.equations
+      .filter((e) => typeof e?.lean === 'string' && typeof e?.latex === 'string')
+      .map((e) => ({ lean: e.lean, latex: e.latex })),
+  };
 }
 
 function goalToView(g: WireGoal, rules: Rules): GoalView {

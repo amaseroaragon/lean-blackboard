@@ -26,7 +26,7 @@ Abre un fichero `.lean` y pulsa el icono de pizarra de la barra de actividad.
 
 Por defecto los objetivos se convierten a partir del texto que imprime Lean. Para una conversión
 que conoce los tipos (`⇒` frente a `→`, división entera, tipo al pasar el ratón, Ctrl/Cmd+clic a
-la definición), añade el paquete Lean compañero al `lakefile.toml` de tu proyecto:
+la definición, los `def` como sus ecuaciones), añade el paquete Lean compañero al `lakefile.toml` de tu proyecto:
 
 ```toml
 [[require]]

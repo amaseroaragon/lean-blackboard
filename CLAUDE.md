@@ -189,7 +189,10 @@ envían en cada petición y se aplican también aquí. Detalles de uso en `docs/
 tests de integración + CI + ESLint, partición de fórmulas largas, exportar el estado completo como
 LaTeX e interactividad en modo preciso (tipo al pasar el ratón, Ctrl/Cmd+clic a la definición).
 Después: sección *Before* (objetivos al principio de la línea) con resaltado de cambios, mensajes
-de error/aviso con notación matemática y estados fijados. Protocolo del paquete Lean: versión 4.
+de error/aviso con notación matemática y estados fijados. Después (2026-11-09): sección
+*Definition* en modo preciso (firma y ecuaciones de los `def`/`abbrev` del comando en el cursor, a
+partir de las ecuaciones de Lean) y constantes nombradas como las imprime Lean en ese contexto.
+Protocolo del paquete Lean: versión 5.
 Ver `docs/`.
 
 ## Comandos

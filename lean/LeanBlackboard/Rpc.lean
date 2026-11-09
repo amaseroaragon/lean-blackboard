@@ -1,12 +1,14 @@
 import Lean
 import LeanBlackboard.Latex
 import LeanBlackboard.Command
+import LeanBlackboard.Definition
 
 /-!
 # RPC method `LeanBlackboard.getGoalsLatex`
 
 Same goals as `Lean.Widget.getInteractiveGoals` (it is built on top of it, so hypotheses, bundling,
-case names and diff markers match the infoview), plus LaTeX rendered from the real `Expr`s.
+case names and diff markers match the infoview), plus LaTeX rendered from the real `Expr`s, plus
+the definitions of the `def` command at the position (signature and equations).
 
 The response has no RPC references, so the client has nothing to release.
 -/
@@ -16,7 +18,7 @@ namespace LeanBlackboard
 open Lean Server Widget Meta
 
 /-- Bumped on incompatible changes to params or response. -/
-def protocolVersion : Nat := 4
+def protocolVersion : Nat := 5
 
 structure GoalsLatexParams where
   textDocument : Lsp.TextDocumentIdentifier
@@ -58,6 +60,8 @@ structure GoalsLatex where
   after). Changed subterms are marked `lbdiff=old` here and `lbdiff=new` in `goals`.
   -/
   goalsBefore? : Option (Array GoalLatex) := none
+  /-- When the position is in a `def`/`abbrev` command: its definitions, in source order. -/
+  definitions : Array DefinitionLatex := #[]
   /-- Data for marked subterms, indexed by the `lbid` in the LaTeX (empty if not interactive). -/
   subexprs : Array SubexprData := #[]
   deriving FromJson, ToJson
@@ -177,8 +181,35 @@ private def goalsBefore (p : GoalsLatexParams) :
     | .error e => .error e
 
 /--
+The definitions of the command at the position, if it is a `def`/`abbrev` (other commands answer
+at once: this never waits for a theorem's proof to be elaborated).
+-/
+private def definitionsAt (p : GoalsLatexParams) :
+    RequestM (ServerTask (Array (Elab.ContextInfo × Name))) := do
+  let doc ← RequestM.readDoc
+  let pos := doc.meta.text.lspPosToUtf8Pos p.position
+  return RequestM.findCmdParsedSnap doc pos |>.bindCheap fun
+    | some cmd =>
+      if isDefinitionCommand cmd.stx then
+        cmd.elabSnap.infoTreeSnap.task.asServerTask.mapCheap fun s =>
+          (s.infoTree?.map commandDefinitions).getD #[]
+      else .pure #[]
+    | none => .pure #[]
+
+/-- Renders the shown definitions among `defs`; a definition that fails is skipped. -/
+private def definitionsToLatex (r : Renderer) (defs : Array (Elab.ContextInfo × Name)) :
+    IO (Array DefinitionLatex) :=
+  defs.filterMapM fun (ctx, c) => do
+    try
+      ctx.runMetaM {} do
+        unless ← isShownDefinition c do return none
+        some <$> definitionToLatex c (safeLatex r · ·)
+    catch _ => return none
+
+/--
 Goals (tactic mode) and expected type (term mode) at a position, with LaTeX rendered from the
-actual expressions, plus the goals before the tactic. `none` if there are no goals at all.
+actual expressions, plus the goals before the tactic and the definitions of the command. `none`
+if there is nothing to show.
 -/
 @[server_rpc_method]
 def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLatex)) := do
@@ -187,8 +218,10 @@ def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLa
   let termTask ← FileWorker.getInteractiveTermGoal
     { textDocument := p.textDocument, position := p.position }
   let beforeTask ← goalsBefore p
+  let defsTask ← definitionsAt p
   RequestM.bindTaskCostly goalsTask fun goals? => do
    RequestM.bindTaskCostly beforeTask fun before? => do
+   RequestM.bindTaskCostly defsTask fun defs => do
     RequestM.mapTaskCostly termTask fun term? => do
       let goals? ← match goals? with
         | .error e => throw e
@@ -200,7 +233,7 @@ def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLa
       let before? := match before? with
         | .error _ => none
         | .ok b => b
-      if goals?.isNone && term?.isNone then return none
+      if goals?.isNone && term?.isNone && defs.isEmpty then return none
       let r : Renderer := {
         rules := p.rules, interactive := p.interactive,
         state := ← IO.mkRef { currentUri := p.textDocument.uri } }
@@ -217,7 +250,10 @@ def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLa
       let termGoal? ← match term? with
         | some t => some <$> (termGoalToLatex r t : IO _)
         | none => pure none
-      return some { goals, termGoal?, goalsBefore?, subexprs := (← r.state.get).subexprs }
+      let definitions ← definitionsToLatex r defs
+      if goals?.isNone && term?.isNone && definitions.isEmpty then return none
+      return some {
+        goals, termGoal?, goalsBefore?, definitions, subexprs := (← r.state.get).subexprs }
 
 structure ExprsLatexParams where
   /-- Root `SubexprInfo.info` references of expressions embedded in messages. -/

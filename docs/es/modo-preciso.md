@@ -20,12 +20,36 @@ en el servidor de Lean y devuelve LaTeX. Lo que cambia:
 Además, solo en modo preciso: al pasar el ratón por una subexpresión se ve su tipo, y Ctrl/Cmd+clic
 abre su definición (Lean core, Mathlib o tu propio proyecto).
 
+Las constantes se nombran como las imprime Lean donde está el cursor: `fact` dentro de
+`namespace Foo` (o tras `open Foo`), no `Foo.fact`.
+
 Con Mathlib, también: `deriv (fun x => …) x` como d/dx, integrales `∫_a^b … dx`, límites
 `Tendsto f atTop (nhds l)` como lim, `∃!`, conjuntos por comprensión `{x ∈ ℝ | …}` y la inclusión
 de conjuntos (Mathlib elabora `s ⊆ t` como `s ≤ t`; el modo preciso lo devuelve a ⊆ por el tipo).
 
 Las reglas propias `functions` y `symbols` (`leanBlackboard.customRules`) se aplican en los dos
 modos; las de operadores (`infix`, `prefix`…) solo en el rápido. Las macros se aplican siempre.
+
+## Definiciones
+
+Con el cursor en cualquier punto de un `def` o un `abbrev`, el panel muestra una sección
+**Definition**: la firma y las ecuaciones que la definen, como en la pizarra. El ajuste de patrones
+da una ecuación por caso, y las definiciones recursivas se leen como su recursión (las ecuaciones
+que genera el propio Lean, `f.eq_1`, …), no como el término compilado:
+
+```lean
+def factorial : ℕ → ℕ
+  | 0 => 1
+  | n + 1 => (n + 1) * factorial n
+```
+
+muestra *factorial : ℕ → ℕ*, *factorial(0) = 1* y *factorial(n + 1) = (n + 1) · factorial(n)*.
+Los patrones solapados (`| _ => …`) añaden la condición que Lean demuestra para ellos
+(*… if x ≠ 0*). Cada fila tiene el cambio Math/Lean y el botón Copy; el botón Copy de la sección y
+`Copy Goal State` la exportan como LaTeX. No se muestran instancias, proyecciones de `structure` ni
+teoremas.
+
+Solo en modo preciso: el modo rápido no tiene la definición elaborada.
 
 ## Cómo activarlo en un proyecto
 
@@ -83,3 +107,5 @@ Con `import LeanBlackboard`, el comando `#latex t` muestra el LaTeX que generar�
 #latex ∀ (p q : Prop), p → q → p
 -- \forall p, q : \mathrm{Prop},\ p \Rightarrow q \Rightarrow p
 ```
+
+Y `#latex_def f` muestra la firma y las ecuaciones de la definición `f`, una por línea.

@@ -78,3 +78,58 @@ open Lean Meta LeanBlackboard in
   withLocalDeclD `l (mkApp (mkConst ``List [0]) (mkConst ``Nat)) fun l => do
     let len ← mkAppM ``List.length #[l]
     return (← exprToLatex len rules, ← exprToLatex (mkConst ``Nat) rules, ← exprToLatex len)
+
+-- Definitions: signature and defining equations (`#latex_def`). Names are shown as Lean prints
+-- them here (`fact`, not `DefTests.fact`); hygienic binders (`| _ =>`) get plain names.
+namespace DefTests
+
+def sq (x : Nat) : Nat := x ^ 2 + 1
+def fact : Nat → Nat
+  | 0 => 1
+  | n + 1 => (n + 1) * fact n
+def isZero : Nat → Bool
+  | 0 => true
+  | _ => false
+def fib : Nat → Nat
+  | 0 => 0
+  | 1 => 1
+  | n + 2 => fib n + fib (n + 1)
+def half (n : Nat) : Nat := n / 2
+def seven : Nat := 7
+
+/--
+info: \mathrm{sq} : \mathbb{N} \to \mathbb{N}
+\operatorname{sq}\left(x\right) = x^{2} + 1
+-/
+#guard_msgs in #latex_def sq
+/--
+info: \mathrm{fact} : \mathbb{N} \to \mathbb{N}
+\operatorname{fact}\left(0\right) = 1
+\operatorname{fact}\left(n + 1\right) = \left(n + 1\right) \cdot \operatorname{fact}\left(n\right)
+-/
+#guard_msgs in #latex_def fact
+/--
+info: \mathrm{isZero} : \mathbb{N} \to \mathrm{Bool}
+\operatorname{isZero}\left(0\right) = \mathrm{true}
+\operatorname{isZero}\left(x\right) = \mathrm{false} \quad \text{if } x \neq 0
+-/
+#guard_msgs in #latex_def isZero
+/--
+info: \mathrm{half} : \mathbb{N} \to \mathbb{N}
+\operatorname{half}\left(n\right) = \left\lfloor \frac{n}{2} \right\rfloor
+-/
+#guard_msgs in #latex_def half
+/--
+info: \mathrm{fib} : \mathbb{N} \to \mathbb{N}
+\operatorname{fib}\left(0\right) = 0
+\operatorname{fib}\left(1\right) = 1
+\operatorname{fib}\left(n + 2\right) = \operatorname{fib}\left(n\right) + \operatorname{fib}\left(n + 1\right)
+-/
+#guard_msgs in #latex_def fib
+/--
+info: \mathrm{seven} : \mathbb{N}
+\mathrm{seven} = 7
+-/
+#guard_msgs in #latex_def seven
+
+end DefTests

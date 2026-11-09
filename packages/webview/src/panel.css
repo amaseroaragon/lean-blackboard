@@ -139,6 +139,17 @@ pre {
   border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
 }
 
+/* Definitions: the signature, then the equations under a rule (like a goal's target). */
+.definition {
+  border-left-color: var(--vscode-symbolIcon-functionForeground, var(--vscode-textLink-foreground));
+}
+
+.definition .signature + .equation {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+}
+
 /* Before/after: subterms changed by the step (precise mode). */
 [data-lbdiff='new'] {
   border-radius: 2px;

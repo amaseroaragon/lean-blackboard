@@ -25,7 +25,7 @@ Open a `.lean` file and click the blackboard icon in the activity bar.
 ## Precise mode (optional)
 
 By default the goals are converted from Lean's text output. For type-aware rendering (`⇒` vs `→`,
-integer division, hover types, Ctrl/Cmd+click to definition), add the companion Lean package to
+integer division, hover types, Ctrl/Cmd+click to definition, `def`s shown as their equations), add the companion Lean package to
 your project's `lakefile.toml`:
 
 ```toml

@@ -32,6 +32,22 @@ export type GoalView =
   /** Fallback from `$/lean/plainGoal`: one pre-rendered goal, shown as Lean text. */
   | { kind: 'plain'; text: string };
 
+/** One defining equation of a definition (`f(n + 1) = …`, maybe with an `if` condition). */
+export interface EquationView {
+  lean: string;
+  latex: string;
+}
+
+/** A `def`/`abbrev` at the cursor (precise mode): signature and defining equations. */
+export interface DefinitionView {
+  name: string;
+  nameLatex: string;
+  /** Type in Lean syntax. */
+  type: string;
+  typeLatex: string;
+  equations: EquationView[];
+}
+
 export type PanelState =
   | { kind: 'waiting' }
   | { kind: 'unavailable' }
@@ -49,6 +65,8 @@ export type PanelState =
        * In precise mode, changed subterms are marked `lbdiff=old` here and `lbdiff=new` in `goals`.
        */
       goalsBefore?: GoalView[];
+      /** Precise mode only: the definitions of the `def`/`abbrev` command at the cursor. */
+      definitions?: DefinitionView[];
       /** Errors, warnings and infos on the cursor's line. */
       messages?: MessageView[];
       /**

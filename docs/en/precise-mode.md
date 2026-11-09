@@ -20,12 +20,35 @@ server and returns LaTeX. What changes:
 Also, only in precise mode: hovering over a subexpression shows its type, and Ctrl/Cmd+click opens
 its definition (Lean core, Mathlib or your own project).
 
+Constants are named as Lean prints them where the cursor is: `fact` inside `namespace Foo` (or
+after `open Foo`), not `Foo.fact`.
+
 With Mathlib, also: `deriv (fun x => …) x` as d/dx, integrals `∫_a^b … dx`, limits
 `Tendsto f atTop (nhds l)` as lim, `∃!`, set-builder notation `{x ∈ ℝ | …}` and set inclusion
 (Mathlib elaborates `s ⊆ t` as `s ≤ t`; precise mode turns it back into ⊆ using the type).
 
 Custom `functions` and `symbols` rules (`leanBlackboard.customRules`) apply in both modes; operator
 rules (`infix`, `prefix`…) only in fast mode. Macros always apply.
+
+## Definitions
+
+With the cursor anywhere in a `def` or `abbrev`, the panel shows a **Definition** section: the
+signature and the defining equations, as on a blackboard. Pattern matching gives one equation per
+case, and recursive definitions read as their recursion (Lean's own equation lemmas `f.eq_1`, …),
+not as the compiled term:
+
+```lean
+def factorial : ℕ → ℕ
+  | 0 => 1
+  | n + 1 => (n + 1) * factorial n
+```
+
+shows *factorial : ℕ → ℕ*, *factorial(0) = 1* and *factorial(n + 1) = (n + 1) · factorial(n)*.
+Overlapping patterns (`| _ => …`) add the condition Lean proves for them (*… if x ≠ 0*). Each row
+has the Math/Lean toggle and a Copy button; the section's Copy button and `Copy Goal State` export
+it as LaTeX. Instances, `structure` projections and theorems are not shown.
+
+Only in precise mode: fast mode does not have the elaborated definition.
 
 ## Enabling it in a project
 
@@ -82,3 +105,5 @@ With `import LeanBlackboard`, the `#latex t` command shows the LaTeX precise mod
 #latex ∀ (p q : Prop), p → q → p
 -- \forall p, q : \mathrm{Prop},\ p \Rightarrow q \Rightarrow p
 ```
+
+And `#latex_def f` shows the signature and equations of the definition `f`, one per line.

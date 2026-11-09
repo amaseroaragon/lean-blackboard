@@ -348,17 +348,24 @@ partial def renderCore (e : Expr) : LatexM Tex := do
   | .lit (.strVal s) => return atom (texttt s.quote)
   | .sort .zero => return atom "\\mathrm{Prop}"
   | .sort (.succ .zero) => return atom "\\mathrm{Type}"
-  | .const c _ => return atom (constLatex (← read) c false)
+  | .const c _ => return atom (← constLatex c false)
   | .forallE .. => renderForall e
   | .lam .. => renderLam e
   | .app .. => renderApp e
   | _ => fallback e
 
-partial def constLatex (ctx : Ctx) (c : Name) (head : Bool) : String :=
+/--
+Rules match the full name; otherwise the constant is shown as Lean prints it in this context
+(relative to the current namespace and `open`s: `fact` inside `namespace Foo`, not `Foo.fact`).
+-/
+partial def constLatex (c : Name) (head : Bool) : LatexM String := do
   let s := c.toString (escape := false)
-  match ctx.symbols.get? s with
-  | some l => l
-  | none => (builtinSymbols.lookup c).getD (identToLatex s (head := head))
+  match (← read).symbols.get? s with
+  | some l => return l
+  | none =>
+    if let some l := builtinSymbols.lookup c then return l
+    let shown ← try unresolveNameGlobal c catch _ => pure c
+    return identToLatex (shown.toString (escape := false)) (head := head)
 
 partial def binop (op : String) (p : Nat) (assoc : Ordering) (a b : Expr) : LatexM Tex := do
   let la ← render a
@@ -389,8 +396,8 @@ partial def renderApp (e : Expr) : LatexM Tex := do
         let prec := if closesWithDelimiter rule.template then maxPrec else argPrec
         if rest.isEmpty then return { s := applied, prec }
         return { s := applied ++ (← argList rest), prec := argPrec }
-    if explicit.isEmpty then return atom (constLatex (← read) c false)
-    return { s := constLatex (← read) c true ++ (← argList explicit), prec := maxPrec }
+    if explicit.isEmpty then return atom (← constLatex c false)
+    return { s := (← constLatex c true) ++ (← argList explicit), prec := maxPrec }
   let explicit ← explicitArgs f args
   let head ← render f
   if explicit.isEmpty then return head
