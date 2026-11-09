@@ -132,4 +132,36 @@ info: \mathrm{seven} : \mathbb{N}
 -/
 #guard_msgs in #latex_def seven
 
+-- Structures show their fields; inductive types, their constructors.
+structure Point where
+  x : Int
+  y : Int
+  h : x < y
+inductive Tree where
+  | leaf : Tree
+  | node : Tree → Nat → Tree → Tree
+inductive Even : Nat → Prop where
+  | zero : Even 0
+  | step (n : Nat) : Even n → Even (n + 2)
+
+/--
+info: \mathrm{Point} : \mathrm{Type}
+x : \mathbb{Z}
+y : \mathbb{Z}
+h : x < y
+-/
+#guard_msgs in #latex_def Point
+/--
+info: \mathrm{Tree} : \mathrm{Type}
+\mathrm{leaf} : \mathrm{Tree}
+\mathrm{node} : \mathrm{Tree} \to \mathbb{N} \to \mathrm{Tree} \to \mathrm{Tree}
+-/
+#guard_msgs in #latex_def Tree
+/--
+info: \mathrm{Even} : \mathbb{N} \to \mathrm{Prop}
+\mathrm{zero} : \operatorname{Even}\left(0\right)
+\mathrm{step} : \forall n \in \mathbb{N},\ \operatorname{Even}\left(n\right) \Rightarrow \operatorname{Even}\left(n + 2\right)
+-/
+#guard_msgs in #latex_def Even
+
 end DefTests

@@ -89,6 +89,7 @@ describe('preciseGoalsToView', () => {
     expect(v.goals).toBeNull();
     expect(v.definitions).toHaveLength(1);
     expect(v.definitions?.[0]?.equations).toEqual([def.equations[0]]);
+    expect(v.definitions?.[0]).toMatchObject({ kind: 'def', members: [] });
     const none = preciseGoalsToView({ version: PRECISE_PROTOCOL_VERSION, goals: [], definitions: [] }, defaultRules);
     expect(none.goals).toEqual([]);
     expect(none.definitions).toBeUndefined();
@@ -96,8 +97,23 @@ describe('preciseGoalsToView', () => {
 
   it('exports definitions as LaTeX arrays', () => {
     const doc = definitionsToLatexDocument([
-      { name: 'seven', nameLatex: '\\mathrm{seven}', type: 'Nat', typeLatex: '\\mathbb{N}', equations: [{ lean: 'seven = 7', latex: '\\htmlData{lbid=0}{\\mathrm{seven}} = 7' }] },
+      { kind: 'def', members: [], name: 'seven', nameLatex: '\\mathrm{seven}', type: 'Nat', typeLatex: '\\mathbb{N}', equations: [{ lean: 'seven = 7', latex: '\\htmlData{lbid=0}{\\mathrm{seven}} = 7' }] },
     ]);
     expect(doc).toBe('% Definition seven\n\\[\n\\begin{array}{l}\n\\mathrm{seven} : \\mathbb{N} \\\\\n\\mathrm{seven} = 7\n\\end{array}\n\\]\n');
+  });
+
+  it('reads structure fields and inductive constructors', () => {
+    const point = {
+      kind: 'structure',
+      name: 'Point',
+      nameLatex: '\\mathrm{Point}',
+      type: 'Type',
+      typeLatex: '\\mathrm{Type}',
+      members: [{ name: 'x', nameLatex: 'x', type: 'Int', typeLatex: '\\mathbb{Z}' }, { name: 'bad' }],
+    };
+    const v = preciseGoalsToView({ version: PRECISE_PROTOCOL_VERSION, goals: [], definitions: [point] }, defaultRules);
+    expect(v.definitions?.[0]).toMatchObject({ kind: 'structure', equations: [], members: [point.members[0]] });
+    expect(definitionsToLatexDocument(v.definitions ?? [])).toContain('% Structure Point');
+    expect(definitionsToLatexDocument(v.definitions ?? [])).toContain('x : \\mathbb{Z}');
   });
 });

@@ -38,14 +38,30 @@ export interface EquationView {
   latex: string;
 }
 
-/** A `def`/`abbrev` at the cursor (precise mode): signature and defining equations. */
+/** A field of a `structure` or a constructor of an `inductive`: `name : type`. */
+export interface MemberView {
+  name: string;
+  nameLatex: string;
+  /** Type in Lean syntax. */
+  type: string;
+  typeLatex: string;
+}
+
+export type DefinitionKind = 'def' | 'structure' | 'inductive';
+
+/**
+ * A declaration of the command at the cursor (precise mode): signature plus the defining equations
+ * (`def`/`abbrev`), the fields (`structure`) or the constructors (`inductive`).
+ */
 export interface DefinitionView {
+  kind: DefinitionKind;
   name: string;
   nameLatex: string;
   /** Type in Lean syntax. */
   type: string;
   typeLatex: string;
   equations: EquationView[];
+  members: MemberView[];
 }
 
 export type PanelState =
@@ -65,7 +81,7 @@ export type PanelState =
        * In precise mode, changed subterms are marked `lbdiff=old` here and `lbdiff=new` in `goals`.
        */
       goalsBefore?: GoalView[];
-      /** Precise mode only: the definitions of the `def`/`abbrev` command at the cursor. */
+      /** Precise mode only: the declarations of the `def`/`structure`/`inductive` command at the cursor. */
       definitions?: DefinitionView[];
       /** Errors, warnings and infos on the cursor's line. */
       messages?: MessageView[];

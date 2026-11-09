@@ -113,6 +113,16 @@ test('definitions: signature and equations (precise mode)', async () => {
   assert.equal(s.goals, null);
 });
 
+test('structure fields and inductive constructors (precise mode)', async () => {
+  await openAt('LeanSample.lean', 'valid : lo ≤ hi');
+  const st = await waitFor('structure', goalsWhere((s) => s.definitions?.[0]?.kind === 'structure'));
+  assert.deepEqual(st.definitions?.[0]?.members.map((m) => m.name), ['lo', 'hi', 'valid']);
+  assert.match(stripMarkers(st.definitions?.[0]?.members[2]?.typeLatex ?? ''), /\\mathrm\{lo\} \\leq \\mathrm\{hi\}/);
+  await openAt('LeanSample.lean', '| node : Tree → Nat → Tree → Tree');
+  const ind = await waitFor('inductive', goalsWhere((s) => s.definitions?.[0]?.kind === 'inductive'));
+  assert.deepEqual(ind.definitions?.[0]?.members.map((m) => m.name), ['leaf', 'node']);
+});
+
 test('Before/After with changed subterms (precise mode)', async () => {
   const editor = await openAt('LeanSample.lean', 'rw [Nat.mul_comm]');
   const line = editor.selection.active.line;

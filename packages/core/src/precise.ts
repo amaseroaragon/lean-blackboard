@@ -1,7 +1,7 @@
 // Precise mode: wire format of the companion Lean package's RPC method
 // `LeanBlackboard.getGoalsLatex` (see `lean/LeanBlackboard/Rpc.lean`).
 
-import type { DefinitionView, GoalView, HypView, SubexprView } from './protocol';
+import type { DefinitionKind, DefinitionView, GoalView, HypView, MemberView, SubexprView } from './protocol';
 import { identToLatex } from './render/ident';
 import type { Rules } from './rules/types';
 
@@ -102,27 +102,48 @@ export function preciseGoalsToView(res: unknown, rules: Rules): PreciseView {
   return { goals: noTacticState ? null : goals, termGoal, subexprs, goalsBefore, definitions };
 }
 
-function isWireDefinition(d: unknown): d is DefinitionView {
+interface WireDefinition {
+  kind?: unknown;
+  name: string;
+  nameLatex: string;
+  type: string;
+  typeLatex: string;
+  equations?: unknown;
+  members?: unknown;
+}
+
+const KINDS: readonly DefinitionKind[] = ['def', 'structure', 'inductive'];
+
+function isWireDefinition(d: unknown): d is WireDefinition {
   if (typeof d !== 'object' || d === null) return false;
   const x = d as Record<string, unknown>;
   return (
     typeof x.name === 'string' &&
     typeof x.nameLatex === 'string' &&
     typeof x.type === 'string' &&
-    typeof x.typeLatex === 'string' &&
-    Array.isArray(x.equations)
+    typeof x.typeLatex === 'string'
   );
 }
 
-function definitionToView(d: DefinitionView): DefinitionView {
+const arrayOf = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+
+function definitionToView(d: WireDefinition): DefinitionView {
   return {
+    kind: KINDS.find((k) => k === d.kind) ?? 'def',
     name: d.name,
     nameLatex: d.nameLatex,
     type: d.type,
     typeLatex: d.typeLatex,
-    equations: d.equations
-      .filter((e) => typeof e?.lean === 'string' && typeof e?.latex === 'string')
-      .map((e) => ({ lean: e.lean, latex: e.latex })),
+    equations: arrayOf(d.equations)
+      .filter(isObj)
+      .filter((e) => typeof e.lean === 'string' && typeof e.latex === 'string')
+      .map((e) => ({ lean: e.lean as string, latex: e.latex as string })),
+    members: arrayOf(d.members)
+      .filter(isObj)
+      .filter((m): m is Record<string, unknown> & MemberView =>
+        ['name', 'nameLatex', 'type', 'typeLatex'].every((k) => typeof m[k] === 'string'))
+      .map((m) => ({ name: m.name, nameLatex: m.nameLatex, type: m.type, typeLatex: m.typeLatex })),
   };
 }
 

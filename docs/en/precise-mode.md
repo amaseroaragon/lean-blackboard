@@ -32,7 +32,7 @@ rules (`infix`, `prefix`…) only in fast mode. Macros always apply.
 
 ## Definitions
 
-With the cursor anywhere in a `def` or `abbrev`, the panel shows a **Definition** section: the
+With the cursor anywhere in a `def` or `abbrev` (or a `structure` or `inductive`), the panel shows a **Definition** section: the
 signature and the defining equations, as on a blackboard. Pattern matching gives one equation per
 case, and recursive definitions read as their recursion (Lean's own equation lemmas `f.eq_1`, …),
 not as the compiled term:
@@ -46,7 +46,11 @@ def factorial : ℕ → ℕ
 shows *factorial : ℕ → ℕ*, *factorial(0) = 1* and *factorial(n + 1) = (n + 1) · factorial(n)*.
 Overlapping patterns (`| _ => …`) add the condition Lean proves for them (*… if x ≠ 0*). Each row
 has the Math/Lean toggle and a Copy button; the section's Copy button and `Copy Goal State` export
-it as LaTeX. Instances, `structure` projections and theorems are not shown.
+it as LaTeX.
+
+A `structure` shows its fields (*lo : ℤ*, *hi : ℤ*, *valid : lo ≤ hi*) and an `inductive` type its
+constructors (*leaf : Tree*, *node : Tree → ℕ → Tree → Tree*). Instances, the functions Lean
+generates (projections, recursors…) and theorems are not shown.
 
 Only in precise mode: fast mode does not have the elaborated definition.
 
@@ -106,4 +110,5 @@ With `import LeanBlackboard`, the `#latex t` command shows the LaTeX precise mod
 -- \forall p, q : \mathrm{Prop},\ p \Rightarrow q \Rightarrow p
 ```
 
-And `#latex_def f` shows the signature and equations of the definition `f`, one per line.
+And `#latex_def f` shows the signature and equations of the definition `f` (or the fields or
+constructors of a type), one per line.

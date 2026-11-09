@@ -313,12 +313,17 @@ function renderGoalsBody(state: GoalsState, keyPrefix: string): Node[] {
   return nodes;
 }
 
-/** The `def`s of the command at the cursor: signature, then one row per defining equation. */
+/**
+ * The declarations of the command at the cursor: signature, then one row per defining equation,
+ * field or constructor.
+ */
 function renderDefinitions(defs: DefinitionView[], keyPrefix: string): Node[] {
   const copy = button('Copy', 'Copy the definition as LaTeX', () =>
     vscode.postMessage({ type: 'copy', text: definitionsToLatexDocument(defs) }),
   );
-  const title = defs.length === 1 ? 'Definition' : `Definitions (${defs.length})`;
+  const kindTitle = { def: 'Definition', structure: 'Structure', inductive: 'Inductive type' } as const;
+  const first = defs[0];
+  const title = defs.length === 1 && first ? kindTitle[first.kind] : `Definitions (${defs.length})`;
   const nodes: Node[] = [el('div', 'heading', el('h2', 'count', title), copy)];
   defs.forEach((d, i) => {
     const key = `${keyPrefix}d${i}:${d.name}`;
@@ -326,6 +331,9 @@ function renderDefinitions(defs: DefinitionView[], keyPrefix: string): Node[] {
     section.append(
       renderRow({ key: `${key}:sig`, latex: `${d.nameLatex} : ${d.typeLatex}`, lean: `${d.name} : ${d.type}`, className: 'signature' }),
       ...d.equations.map((e, j) => renderRow({ key: `${key}:eq${j}`, latex: e.latex, lean: e.lean, className: 'equation' })),
+      ...d.members.map((m, j) =>
+        renderRow({ key: `${key}:m${j}`, latex: `${m.nameLatex} : ${m.typeLatex}`, lean: `${m.name} : ${m.type}`, className: 'member' }),
+      ),
     );
     nodes.push(section);
   });

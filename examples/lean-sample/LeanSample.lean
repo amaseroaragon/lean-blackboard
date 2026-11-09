@@ -44,3 +44,13 @@ def square (x : Nat) : Nat := x ^ 2 + 1
 def factorial : Nat → Nat
   | 0 => 1
   | n + 1 => (n + 1) * factorial n
+
+-- Structures show their fields; inductive types, their constructors.
+structure Interval where
+  lo : Int
+  hi : Int
+  valid : lo ≤ hi
+
+inductive Tree where
+  | leaf : Tree
+  | node : Tree → Nat → Tree → Tree

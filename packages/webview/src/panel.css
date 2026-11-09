@@ -144,7 +144,8 @@ pre {
   border-left-color: var(--vscode-symbolIcon-functionForeground, var(--vscode-textLink-foreground));
 }
 
-.definition .signature + .equation {
+.definition .signature + .equation,
+.definition .signature + .member {
   margin-top: 4px;
   padding-top: 4px;
   border-top: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));

@@ -10,6 +10,9 @@ the side conditions Lean adds for overlapping patterns (`… if x ≠ 0`).
 
 The equations are Lean's own equation theorems (`f.eq_1`, …, from `getEqnsFor?`), so recursive
 definitions read as their recursion and not as the compiled term (`Nat.brecOn`, `WellFounded.fix`).
+
+A `structure` is shown with its fields and an `inductive` with its constructors (`kind` and
+`members`).
 -/
 
 namespace LeanBlackboard
@@ -22,31 +25,54 @@ structure EquationLatex where
   latex : String
   deriving FromJson, ToJson
 
-structure DefinitionLatex where
+/-- A field of a `structure` or a constructor of an `inductive`: `name : type`. -/
+structure MemberLatex where
   name : String
   nameLatex : String
   /-- Lean syntax. -/
   type : String
   typeLatex : String
-  equations : Array EquationLatex
   deriving FromJson, ToJson
 
-/-- Whether a command is (or contains, for `mutual`) a `def` or `abbrev`. -/
+structure DefinitionLatex where
+  /-- `def`, `structure` or `inductive`. -/
+  kind : String := "def"
+  name : String
+  nameLatex : String
+  /-- Lean syntax. -/
+  type : String
+  typeLatex : String
+  /-- Defining equations (`def` only). -/
+  equations : Array EquationLatex := #[]
+  /-- Fields (`structure`) or constructors (`inductive`). -/
+  members : Array MemberLatex := #[]
+  deriving FromJson, ToJson
+
+/-- Whether a command is (or contains, for `mutual`) a `def`, `abbrev`, `structure` or `inductive`. -/
 partial def isDefinitionCommand (stx : Syntax) : Bool :=
   match stx.getKind with
   | ``Lean.Parser.Command.declaration =>
     let k := stx[1].getKind
-    k == ``Lean.Parser.Command.definition || k == ``Lean.Parser.Command.«abbrev»
+    k == ``Lean.Parser.Command.definition || k == ``Lean.Parser.Command.«abbrev» ||
+      k == ``Lean.Parser.Command.«structure» || k == ``Lean.Parser.Command.«inductive» ||
+      k == ``Lean.Parser.Command.classInductive
   | ``Lean.Parser.Command.«mutual» => stx[1].getArgs.any isDefinitionCommand
   | _ => false
 
-/-- Whether `c` is a user definition worth showing (not an instance, projection or auxiliary). -/
+/--
+Whether `c` is a user definition or type worth showing (not an instance, projection, constructor
+or auxiliary definition).
+-/
 def isShownDefinition (c : Name) : MetaM Bool := do
   let env ← getEnv
-  let some (.defnInfo _) := env.find? c | return false
-  if c.isInternal || isAuxRecursor env c || isNoConfusion env c then return false
-  if (← isProjectionFn c) || (← isInstance c) then return false
-  return true
+  if c.isInternal then return false
+  match env.find? c with
+  | some (.inductInfo _) => return true
+  | some (.defnInfo _) =>
+    if isAuxRecursor env c || isNoConfusion env c then return false
+    if (← isProjectionFn c) || (← isInstance c) then return false
+    return true
+  | _ => return false
 
 /--
 The definitions of a command, in source order, each with the context to render it in (whose
@@ -100,6 +126,24 @@ def definitionEquations (c : Name) : MetaM (Array Expr) := do
   lambdaTelescope v fun xs b => do
     return #[← mkForallFVars xs (← mkEq (mkAppN f xs) b)]
 
+/-- Fields of a structure / constructors of an inductive type, with the parameters as variables. -/
+private def inductiveMembers (iv : InductiveVal) (isStruct : Bool)
+    (render : Expr → String → MetaM String) : MetaM (Array MemberLatex) := do
+  let row (n : Name) (ty : Expr) : MetaM MemberLatex := do
+    -- Shown by their last component, as in the source (`node`, not `Tree.node`).
+    let short := (n.eraseMacroScopes.componentsRev.head?.getD n).toString (escape := false)
+    let type := toString (← ppExpr ty)
+    return { name := short, nameLatex := identToLatex short, type, typeLatex := ← render ty type }
+  if isStruct then
+    let some ctor := iv.ctors.head? | return #[]
+    forallBoundedTelescope (← getConstInfo ctor).type iv.numParams fun _ body =>
+      forallTelescope body fun fields _ => fields.mapM fun f => do
+        let d ← f.fvarId!.getDecl
+        row d.userName d.type
+  else
+    iv.ctors.toArray.mapM fun ctor => do
+      forallBoundedTelescope (← getConstInfo ctor).type iv.numParams fun _ body => row ctor body
+
 /--
 Renders a definition with `render e leanText` (which must never throw). Equations are stated
 without their universally quantified variables; explicit hypotheses become `\text{if }` conditions.
@@ -109,6 +153,13 @@ def definitionToLatex (c : Name) (render : Expr → String → MetaM String) :
   let info ← getConstInfo c
   let f := mkConst c (info.levelParams.map mkLevelParam)
   let type := toString (← ppExpr info.type)
+  if let .inductInfo iv := info then
+    let isStruct := isStructure (← getEnv) c
+    return {
+      kind := if isStruct then "structure" else "inductive",
+      name := c.toString, nameLatex := ← render f c.toString,
+      type, typeLatex := ← render info.type type,
+      members := ← inductiveMembers iv isStruct render }
   let equations ← (← definitionEquations c).mapM fun eq =>
     forallTelescope eq fun xs body => do
       let mut conds : Array Expr := #[]

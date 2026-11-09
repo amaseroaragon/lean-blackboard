@@ -32,7 +32,7 @@ modos; las de operadores (`infix`, `prefix`…) solo en el rápido. Las macros s
 
 ## Definiciones
 
-Con el cursor en cualquier punto de un `def` o un `abbrev`, el panel muestra una sección
+Con el cursor en cualquier punto de un `def` o un `abbrev` (o de una `structure` o un `inductive`), el panel muestra una sección
 **Definition**: la firma y las ecuaciones que la definen, como en la pizarra. El ajuste de patrones
 da una ecuación por caso, y las definiciones recursivas se leen como su recursión (las ecuaciones
 que genera el propio Lean, `f.eq_1`, …), no como el término compilado:
@@ -46,8 +46,11 @@ def factorial : ℕ → ℕ
 muestra *factorial : ℕ → ℕ*, *factorial(0) = 1* y *factorial(n + 1) = (n + 1) · factorial(n)*.
 Los patrones solapados (`| _ => …`) añaden la condición que Lean demuestra para ellos
 (*… if x ≠ 0*). Cada fila tiene el cambio Math/Lean y el botón Copy; el botón Copy de la sección y
-`Copy Goal State` la exportan como LaTeX. No se muestran instancias, proyecciones de `structure` ni
-teoremas.
+`Copy Goal State` la exportan como LaTeX.
+
+Una `structure` muestra sus campos (*lo : ℤ*, *hi : ℤ*, *valid : lo ≤ hi*) y un tipo `inductive`
+sus constructores (*leaf : Tree*, *node : Tree → ℕ → Tree → Tree*). No se muestran instancias, las
+funciones que genera Lean (proyecciones, recursores…) ni teoremas.
 
 Solo en modo preciso: el modo rápido no tiene la definición elaborada.
 
@@ -108,4 +111,5 @@ Con `import LeanBlackboard`, el comando `#latex t` muestra el LaTeX que generar�
 -- \forall p, q : \mathrm{Prop},\ p \Rightarrow q \Rightarrow p
 ```
 
-Y `#latex_def f` muestra la firma y las ecuaciones de la definición `f`, una por línea.
+Y `#latex_def f` muestra la firma y las ecuaciones de la definición `f` (o los campos o
+constructores de un tipo), una por línea.

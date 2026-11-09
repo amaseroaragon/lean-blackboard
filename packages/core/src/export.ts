@@ -23,15 +23,21 @@ export function goalToLatexArray(goal: GoalView): string {
   return stripMarkers(`\\begin{array}{l}\n${body}\n\\end{array}`);
 }
 
-/** A definition as one `array`: signature, then one equation per row. */
+/** A definition as one `array`: signature, then one equation (or field, or constructor) per row. */
 export function definitionToLatexArray(def: DefinitionView): string {
-  const rows = [`${def.nameLatex} : ${def.typeLatex}`, ...def.equations.map((e) => e.latex)];
+  const rows = [
+    `${def.nameLatex} : ${def.typeLatex}`,
+    ...def.equations.map((e) => e.latex),
+    ...def.members.map((m) => `${m.nameLatex} : ${m.typeLatex}`),
+  ];
   return stripMarkers(`\\begin{array}{l}\n${rows.join(' \\\\\n')}\n\\end{array}`);
 }
 
+const KIND_TITLE = { def: 'Definition', structure: 'Structure', inductive: 'Inductive type' } as const;
+
 /** Definitions as display-math blocks separated by blank lines. */
 export function definitionsToLatexDocument(defs: DefinitionView[]): string {
-  return `${defs.map((d) => `% Definition ${d.name}\n\\[\n${definitionToLatexArray(d)}\n\\]`).join('\n\n')}\n`;
+  return `${defs.map((d) => `% ${KIND_TITLE[d.kind]} ${d.name}\n\\[\n${definitionToLatexArray(d)}\n\\]`).join('\n\n')}\n`;
 }
 
 /**

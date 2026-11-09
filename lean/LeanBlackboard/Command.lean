@@ -19,11 +19,15 @@ elab "#latex " t:term : command => runTermElabM fun _ => do
   let e ← instantiateMVars e
   logInfo m!"{← exprToLatex e defaultRules}"
 
-/-- Prints a definition's signature and equations (one per line), with the default rules. -/
+/--
+Prints a definition's signature and equations (or a structure's fields, or an inductive type's
+constructors), one per line, with the default rules.
+-/
 elab "#latex_def " id:ident : command => runTermElabM fun _ => do
   let c ← realizeGlobalConstNoOverloadWithInfo id
   let d ← definitionToLatex c fun e _ => exprToLatex e defaultRules
-  let lines := s!"{d.nameLatex} : {d.typeLatex}" :: d.equations.toList.map (·.latex)
+  let lines := s!"{d.nameLatex} : {d.typeLatex}" ::
+    (d.equations.toList.map (·.latex) ++ d.members.toList.map fun m => s!"{m.nameLatex} : {m.typeLatex}")
   logInfo m!"{"\n".intercalate lines}"
 
 end LeanBlackboard
