@@ -17,12 +17,24 @@
       "latex": "\\bot"
     },
     {
+      "name": "Bool.false",
+      "latex": "\\mathtt{false}"
+    },
+    {
+      "name": "Bool.true",
+      "latex": "\\mathtt{true}"
+    },
+    {
       "name": "ℂ",
       "latex": "\\mathbb{C}"
     },
     {
       "name": "Complex",
       "latex": "\\mathbb{C}"
+    },
+    {
+      "name": "false",
+      "latex": "\\mathtt{false}"
     },
     {
       "name": "False",
@@ -63,6 +75,10 @@
     {
       "name": "Real.pi",
       "latex": "\\pi"
+    },
+    {
+      "name": "true",
+      "latex": "\\mathtt{true}"
     },
     {
       "name": "True",

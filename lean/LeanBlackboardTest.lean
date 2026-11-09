@@ -110,8 +110,8 @@ info: \mathrm{fact} : \mathbb{N} \to \mathbb{N}
 #guard_msgs in #latex_def fact
 /--
 info: \mathrm{isZero} : \mathbb{N} \to \mathrm{Bool}
-\operatorname{isZero}\left(0\right) = \mathrm{true}
-\operatorname{isZero}\left(x\right) = \mathrm{false} \quad \text{if } x \neq 0
+\operatorname{isZero}\left(0\right) = \mathtt{true}
+\operatorname{isZero}\left(x\right) = \mathtt{false} \quad \text{if } x \neq 0
 -/
 #guard_msgs in #latex_def isZero
 /--

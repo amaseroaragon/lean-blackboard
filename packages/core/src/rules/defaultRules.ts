@@ -16,6 +16,11 @@ export const defaultRules: Rules = {
     Type: '\\mathrm{Type}',
     True: '\\mathrm{True}',
     False: '\\mathrm{False}',
+    // `Bool` values, typeset apart from the propositions `True`/`False`.
+    true: '\\mathtt{true}',
+    false: '\\mathtt{false}',
+    'Bool.true': '\\mathtt{true}',
+    'Bool.false': '\\mathtt{false}',
     '∅': '\\emptyset',
     '∞': '\\infty',
     '⊤': '\\top',
