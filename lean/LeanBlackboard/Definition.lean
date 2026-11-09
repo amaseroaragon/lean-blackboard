@@ -84,7 +84,11 @@ partial def cleanBinderNames : Expr → Expr
   | .forallE n t b bi => .forallE (if n.hasMacroScopes then n.eraseMacroScopes else n) t (cleanBinderNames b) bi
   | e => e
 
-/-- The closed equations (`∀ xs, conds → f args = rhs`) of a definition. -/
+/--
+The closed equations (`∀ xs, conds → f args = rhs`) of a definition. Generating them takes most
+of a second for a 40-case `match`, but only the first time: Lean keeps the realized equation
+theorems for later requests on the same environment (measured: no gain from caching them here).
+-/
 def definitionEquations (c : Name) : MetaM (Array Expr) := do
   if let some eqs ← (try getEqnsFor? c catch _ => pure none) then
     if !eqs.isEmpty then
