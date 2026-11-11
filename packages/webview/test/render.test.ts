@@ -51,6 +51,13 @@ describe('webview rendering', () => {
     expect(root().textContent).not.toContain('could not draw');
   });
 
+  it('notes the position inside a simp lemma list', () => {
+    show({ ...base, mode: 'precise', goals: [after], goalsBefore: [before], simpStep: { applied: 1, total: 2 } });
+    expect(root().querySelector('.simp-step')?.textContent).toBe('Lemma list: first 1 of 2 applied');
+    show({ ...base, goals: [after], goalsBefore: [before] });
+    expect(root().querySelector('.simp-step')).toBeNull();
+  });
+
   it('hides Before when nothing changed', () => {
     show({ ...base, goals: [after], goalsBefore: [after] });
     expect(root().querySelector('details.before')).toBeNull();

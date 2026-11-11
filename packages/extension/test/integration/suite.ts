@@ -143,6 +143,27 @@ test('Before/After with changed subterms (precise mode)', async () => {
   assert.ok(after?.kind === 'structured' && after.typeLatex.includes('lbdiff=new'), 'new subterm marked');
 });
 
+test('steps inside a simp lemma list (precise mode)', async () => {
+  const editor = await openAt('LeanSample.lean', 'simp only [Nat.add_zero, Nat.mul_one, h]');
+  const line = editor.selection.active.line;
+  const text = editor.document.lineAt(line).text;
+  const typeAt = async (needle: string, applied: number) => {
+    const character = text.indexOf(needle) + 1; // just inside the lemma
+    editor.selection = new vscode.Selection(line, character, line, character);
+    const s = await waitFor(`simp step ${applied}`, goalsWhere((s) => s.mode === 'precise' && s.simpStep?.applied === applied));
+    assert.equal(s.simpStep?.total, 3);
+    const lean = (g: typeof s.goals) => (g ?? []).map((x) => (x.kind === 'structured' ? x.type : x.text));
+    return { goals: lean(s.goals), before: lean(s.goalsBefore ?? null) };
+  };
+  assert.deepEqual(await typeAt('Nat.add_zero', 1), { goals: ['a * 1 = b'], before: ['(a + 0) * 1 = b'] });
+  assert.deepEqual(await typeAt('Nat.mul_one', 2), { goals: ['a = b'], before: ['a * 1 = b'] });
+  assert.deepEqual(await typeAt('h]', 3), { goals: [], before: ['a = b'] });
+  // Outside the brackets: the usual states around the line.
+  editor.selection = new vscode.Selection(line, 100, line, 100);
+  const s = await waitFor('after simp', goalsWhere((s) => s.mode === 'precise' && s.simpStep === undefined && s.goals?.length === 0));
+  assert.equal(s.goalsBefore?.[0]?.kind === 'structured' && s.goalsBefore[0].type, '(a + 0) * 1 = b');
+});
+
 test('Before in fast mode', async () => {
   const editor = await openAt('FastSample.lean', 'intro hpq hqr hp');
   const line = editor.selection.active.line;

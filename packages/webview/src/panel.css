@@ -162,6 +162,13 @@ pre {
   background: var(--vscode-diffEditor-removedTextBackground);
 }
 
+.simp-step {
+  margin: 4px 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+  font-style: italic;
+}
+
 details.before {
   margin: 6px 0;
   opacity: 0.85;

@@ -54,3 +54,7 @@ structure Interval where
 inductive Tree where
   | leaf : Tree
   | node : Tree → Nat → Tree → Tree
+
+-- Steps of `simp`: move the cursor through the lemma list to see what each lemma adds.
+theorem simp_steps (a b : Nat) (h : b = a) : (a + 0) * 1 = b := by
+  simp only [Nat.add_zero, Nat.mul_one, h]

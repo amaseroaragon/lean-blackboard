@@ -61,6 +61,13 @@ describe('preciseGoalsToView', () => {
     expect(v.goalsBefore).toHaveLength(2);
   });
 
+  it('maps the position in a simp lemma list', () => {
+    const g = { goalPrefix: '⊢ ', hyps: [], type: 'q', typeLatex: 'q' };
+    const res = { version: PRECISE_PROTOCOL_VERSION, goals: [g], goalsBefore: [g], simpStep: { applied: 1, total: 2 } };
+    expect(preciseGoalsToView(res, defaultRules).simpStep).toEqual({ applied: 1, total: 2 });
+    expect(preciseGoalsToView({ ...res, simpStep: null }, defaultRules).simpStep).toBeUndefined();
+  });
+
   it('passes null through', () => {
     expect(preciseGoalsToView(null, defaultRules)).toEqual({ goals: null });
   });

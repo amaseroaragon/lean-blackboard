@@ -10,6 +10,7 @@ import type {
   MessageView,
   Notation,
   PanelState,
+  SimpStepView,
   SubexprView,
   ViewConfig,
   WebviewMessage,
@@ -269,6 +270,7 @@ function renderState(state: PanelState): Node[] {
       if (state.fallbackReason) {
         nodes.push(message(`Showing plain goals (interactive goals failed: ${state.fallbackReason})`, 'message warning'));
       }
+      if (state.simpStep) nodes.push(renderSimpStep(state.simpStep));
       const before = renderBefore(state);
       if (before) nodes.push(before);
       nodes.push(...renderGoalsBody(state, ''));
@@ -349,7 +351,19 @@ function goalsSignature(goals: GoalView[] | null | undefined): string {
   );
 }
 
-/** Collapsible "Before" section: the goals at the start of the line (before this step). */
+/** Note shown with the cursor inside a simp lemma list: which part of the list the goals reflect. */
+function renderSimpStep(step: SimpStepView): HTMLElement {
+  const note = el('div', 'simp-step', `Lemma list: first ${step.applied} of ${step.total} applied`);
+  note.title =
+    'State after running the tactic with only the list items before the cursor; Before has one less. ' +
+    'simp uses all its lemmas at once, so this is what each lemma adds, not a trace of the full simp.';
+  return note;
+}
+
+/**
+ * Collapsible "Before" section: the goals at the start of the line (before this step) or, inside
+ * a simp lemma list, the state without the last lemma before the cursor.
+ */
 function renderBefore(state: GoalsState): HTMLElement | undefined {
   const before = state.goalsBefore;
   if (!before || goalsSignature(before) === goalsSignature(state.goals)) return undefined;

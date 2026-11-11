@@ -1,7 +1,7 @@
 // Precise mode: wire format of the companion Lean package's RPC method
 // `LeanBlackboard.getGoalsLatex` (see `lean/LeanBlackboard/Rpc.lean`).
 
-import type { DefinitionKind, DefinitionView, GoalView, HypView, MemberView, SubexprView } from './protocol';
+import type { DefinitionKind, DefinitionView, GoalView, HypView, MemberView, SimpStepView, SubexprView } from './protocol';
 import { identToLatex } from './render/ident';
 import type { Rules } from './rules/types';
 
@@ -70,6 +70,7 @@ export interface PreciseView {
   termGoal?: GoalView;
   subexprs?: SubexprView[];
   goalsBefore?: GoalView[];
+  simpStep?: SimpStepView;
   definitions?: DefinitionView[];
 }
 
@@ -92,6 +93,11 @@ export function preciseGoalsToView(res: unknown, rules: Rules): PreciseView {
     'goalsBefore' in res && Array.isArray(res.goalsBefore)
       ? (res.goalsBefore as WireGoal[]).map((g) => goalToView(g, rules))
       : undefined;
+  const step = 'simpStep' in res && isObj(res.simpStep) ? res.simpStep : undefined;
+  const simpStep =
+    step && typeof step.applied === 'number' && typeof step.total === 'number'
+      ? { applied: step.applied, total: step.total }
+      : undefined;
   const definitions =
     'definitions' in res && Array.isArray(res.definitions) && res.definitions.length > 0
       ? (res.definitions as unknown[]).filter(isWireDefinition).map(definitionToView)
@@ -99,7 +105,7 @@ export function preciseGoalsToView(res: unknown, rules: Rules): PreciseView {
   // Lean answers `goals: []` when it only has an expected type or definitions: that is
   // "no tactic state".
   const noTacticState = goals.length === 0 && (termGoal !== undefined || definitions !== undefined);
-  return { goals: noTacticState ? null : goals, termGoal, subexprs, goalsBefore, definitions };
+  return { goals: noTacticState ? null : goals, termGoal, subexprs, goalsBefore, simpStep, definitions };
 }
 
 interface WireDefinition {

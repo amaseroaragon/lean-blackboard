@@ -2,6 +2,7 @@ import Lean
 import LeanBlackboard.Latex
 import LeanBlackboard.Command
 import LeanBlackboard.Definition
+import LeanBlackboard.SimpSteps
 
 /-!
 # RPC method `LeanBlackboard.getGoalsLatex`
@@ -49,6 +50,13 @@ structure GoalLatex where
   isRemoved? : Option Bool := none
   deriving FromJson, ToJson
 
+/-- Position in the lemma list of a simp-like tactic (see `LeanBlackboard.SimpSteps`). -/
+structure SimpStepInfo where
+  /-- List items applied in `goals` (those before the cursor); `goalsBefore?` has one less. -/
+  applied : Nat
+  total : Nat
+  deriving FromJson, ToJson
+
 structure GoalsLatex where
   version : Nat := protocolVersion
   /-- Tactic goals; empty array if there are none. -/
@@ -60,6 +68,12 @@ structure GoalsLatex where
   after). Changed subterms are marked `lbdiff=old` here and `lbdiff=new` in `goals`.
   -/
   goalsBefore? : Option (Array GoalLatex) := none
+  /--
+  Set when the cursor is inside the lemma list of a simp-like tactic (`simp only [a, b]`). Then
+  `goals` is the state after the tactic with only the items before the cursor, and `goalsBefore?`
+  the state with one item less.
+  -/
+  simpStep? : Option SimpStepInfo := none
   /-- When the position is in a `def`/`abbrev` command: its definitions, in source order. -/
   definitions : Array DefinitionLatex := #[]
   /-- Data for marked subterms, indexed by the `lbid` in the LaTeX (empty if not interactive). -/
@@ -219,8 +233,10 @@ def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLa
     { textDocument := p.textDocument, position := p.position }
   let beforeTask ← goalsBefore p
   let defsTask ← definitionsAt p
+  let stepTask ← simpStepGoals p.position
   RequestM.bindTaskCostly goalsTask fun goals? => do
    RequestM.bindTaskCostly beforeTask fun before? => do
+   RequestM.bindTaskCostly stepTask fun step? => do
    RequestM.bindTaskCostly defsTask fun defs => do
     RequestM.mapTaskCostly termTask fun term? => do
       let goals? ← match goals? with
@@ -238,6 +254,13 @@ def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLa
         rules := p.rules, interactive := p.interactive,
         state := ← IO.mkRef { currentUri := p.textDocument.uri } }
       let current := goals?.map (·.goals) |>.getD #[]
+      -- Inside a simp lemma list, the states around the cursor replace the ones around the line.
+      let step? := match step? with
+        | .error _ => none
+        | .ok s => s
+      let (current, before?) := match step? with
+        | some s => (s.goals?.getD current, if s.applied == 0 then before? else s.before?)
+        | none => (current, before?)
       -- Before/after highlighting compares subterms of both states (interactive mode only).
       let (diffNew, diffOld) ← match before?, p.interactive with
         | some bs, true =>
@@ -253,7 +276,8 @@ def getGoalsLatex (p : GoalsLatexParams) : RequestM (RequestTask (Option GoalsLa
       let definitions ← definitionsToLatex r defs
       if goals?.isNone && term?.isNone && definitions.isEmpty then return none
       return some {
-        goals, termGoal?, goalsBefore?, definitions, subexprs := (← r.state.get).subexprs }
+        goals, termGoal?, goalsBefore?, definitions, subexprs := (← r.state.get).subexprs
+        simpStep? := step?.map fun s => { applied := s.applied, total := s.total } }
 
 structure ExprsLatexParams where
   /-- Root `SubexprInfo.info` references of expressions embedded in messages. -/

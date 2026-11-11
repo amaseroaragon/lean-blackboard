@@ -81,6 +81,12 @@ export type PanelState =
        * In precise mode, changed subterms are marked `lbdiff=old` here and `lbdiff=new` in `goals`.
        */
       goalsBefore?: GoalView[];
+      /**
+       * Precise mode only: the cursor is inside the lemma list of a simp-like tactic
+       * (`simp only [a, b]`). `goals` is then the state after the tactic with only its first
+       * `applied` list items (those before the cursor), and `goalsBefore` the state with one less.
+       */
+      simpStep?: SimpStepView;
       /** Precise mode only: the declarations of the `def`/`structure`/`inductive` command at the cursor. */
       definitions?: DefinitionView[];
       /** Errors, warnings and infos on the cursor's line. */
@@ -96,6 +102,11 @@ export type PanelState =
       mode: ConversionMode;
     }
   | { kind: 'error'; location: string; message: string };
+
+export interface SimpStepView {
+  applied: number;
+  total: number;
+}
 
 export type Severity = 'error' | 'warning' | 'information' | 'hint';
 
