@@ -27,6 +27,9 @@
   debajo el estado actual. Se oculta si no cambia nada. En modo preciso se resalta la
   subexpresión que cambia: en rojo en *Before* (lo que va a cambiar) y en verde en el estado
   actual (lo nuevo). Las hipótesis nuevas o eliminadas se resaltan en los dos modos.
+- **Pasos dentro de `simp` (solo modo preciso)**: con el cursor dentro de la lista de lemas de
+  `simp only [a, b]`, el panel muestra qué aporta cada lema: el estado actual usa solo los lemas
+  anteriores al cursor y *Before* uno menos. Ver [Modo preciso](modo-preciso.md#pasos-dentro-de-simp).
 - **Mensajes**: errores, avisos e infos de la línea del cursor, con las expresiones en notación
   matemática (en modo preciso, dibujadas desde el `Expr` real) y los objetivos incrustados (por
   ejemplo, *unsolved goals*) como objetivos. Clic en la cabecera de un mensaje para ir a su línea.

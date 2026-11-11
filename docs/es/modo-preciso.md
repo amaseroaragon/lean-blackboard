@@ -57,6 +57,42 @@ ecuaciones, los campos y los constructores se leen del texto fuente, así que en
 habituales (`:= cuerpo`, casos `| patrón => …`, `match` sobre parámetros, campos `nombre : tipo`) y
 no da condiciones laterales. Los cuerpos con tácticas (`:= by …`) no tienen ecuaciones.
 
+## Pasos dentro de `simp`
+
+`simp only [a, b]` es una sola táctica: Lean no guarda ningún estado entre `a` y `b`. Con el cursor
+dentro de los corchetes, el modo preciso lo calcula ejecutando la táctica otra vez, desde el estado
+anterior a ella, solo con los lemas que quedan antes del cursor:
+
+```lean
+theorem simp_steps (a b : ℕ) (h : b = a) : (a + 0) * 1 = b := by
+  simp only [Nat.add_zero, Nat.mul_one, h]
+```
+
+| Cursor | *Before* | Estado actual |
+|---|---|---|
+| en `Nat.add_zero` (o justo tras su coma) | (a + 0) · 1 = b | a · 1 = b |
+| en `Nat.mul_one` | a · 1 = b | a = b |
+| en `h` | a = b | sin objetivos |
+| fuera de los corchetes | principio de la línea | tras el `simp` completo |
+
+Un lema cuenta como aplicado cuando el cursor ha pasado su primer carácter; justo después de `[`
+el panel muestra el estado anterior a la táctica. Una nota encima de los objetivos dice cuántos
+lemas hay aplicados (*Lemma list: first 1 of 3 applied*).
+
+Funciona con `simp`, `simp?`, `simp_all`, `dsimp`, `simpa`, `simp … at h` y, con Mathlib,
+`simp_rw`, `field_simp`, `norm_num [...]` y `push_cast [...]`. Tres cosas a tener en cuenta:
+
+- Es lo que **aporta** cada lema, no una traza de lo que hizo `simp`. `simp` usa todos sus lemas a
+  la vez, así que la lista completa puede reescribir un término de otra forma que un prefijo suyo.
+  (`simp_rw` reescribe con sus reglas en orden, así que ahí los estados son los intermedios reales.)
+- Un lema que por sí solo no progresa deja el estado como estaba, y *Before* se oculta.
+- `simpa … using e` tiene que cerrar el objetivo, cosa que un prefijo de su lista no hace: sus
+  pasos muestran lo que `simp` con los mismos lemas le hace al objetivo.
+
+`rw [a, b]` no necesita nada de esto: Lean ya guarda el estado tras cada regla, y el panel lo
+muestra como la InfoView. El modo rápido no puede ejecutar tácticas, así que siempre muestra los
+estados alrededor de la línea.
+
 ## Cómo activarlo en un proyecto
 
 1. Añade la dependencia en el `lakefile.toml` del proyecto, desde GitHub:

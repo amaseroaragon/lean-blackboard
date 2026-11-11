@@ -26,6 +26,9 @@
   below it. Hidden if nothing changes. In precise mode the changing subexpression is highlighted:
   red in *Before* (what is about to change) and green in the current state (what is new). New or
   removed hypotheses are highlighted in both modes.
+- **Steps inside `simp` (precise mode only)**: with the cursor inside the lemma list of
+  `simp only [a, b]`, the panel shows what each lemma adds: the current state uses only the lemmas
+  before the cursor and *Before* one less. See [Precise mode](precise-mode.md#steps-inside-simp).
 - **Messages**: errors, warnings and infos on the cursor's line, with expressions in math notation
   (in precise mode, rendered from the actual `Expr`) and embedded goals (for example, *unsolved
   goals*) shown as goals. Click a message's header to jump to its line.

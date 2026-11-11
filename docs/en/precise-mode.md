@@ -57,6 +57,41 @@ fields and constructors are read from the source text, so it handles the usual s
 `| pattern => …` cases, `match` on parameters, `name : type` fields) and gives no side conditions.
 Tactic bodies (`:= by …`) have no equations.
 
+## Steps inside `simp`
+
+`simp only [a, b]` is a single tactic: Lean keeps no proof state between `a` and `b`. With the
+cursor inside the brackets, precise mode computes one by running the tactic again, from the state
+before it, with only the lemmas before the cursor:
+
+```lean
+theorem simp_steps (a b : ℕ) (h : b = a) : (a + 0) * 1 = b := by
+  simp only [Nat.add_zero, Nat.mul_one, h]
+```
+
+| Cursor | *Before* | Current state |
+|---|---|---|
+| in `Nat.add_zero` (or just after its comma) | (a + 0) · 1 = b | a · 1 = b |
+| in `Nat.mul_one` | a · 1 = b | a = b |
+| in `h` | a = b | no goals |
+| outside the brackets | start of the line | after the whole `simp` |
+
+A lemma counts as applied once the cursor is past its first character; right after `[` the panel
+shows the state before the tactic. A note above the goals says how many lemmas are applied
+(*Lemma list: first 1 of 3 applied*).
+
+It works with `simp`, `simp?`, `simp_all`, `dsimp`, `simpa`, `simp … at h` and, with Mathlib,
+`simp_rw`, `field_simp`, `norm_num [...]` and `push_cast [...]`. Three things to keep in mind:
+
+- It is what each lemma **adds**, not a trace of what `simp` did. `simp` uses all its lemmas at
+  once, so the full list may rewrite a term differently than a prefix of it does. (`simp_rw`
+  rewrites with its rules in order, so there the states are the real intermediate ones.)
+- A lemma that makes no progress on its own leaves the state as it was, and *Before* is hidden.
+- `simpa … using e` has to close the goal, which a prefix of its list does not: its steps show
+  what `simp` with the same lemmas does to the goal.
+
+`rw [a, b]` needs none of this: Lean itself records the state after each rule, and the panel shows
+it as the InfoView does. Fast mode cannot run tactics, so it always shows the states around the line.
+
 ## Enabling it in a project
 
 1. Add the dependency to the project's `lakefile.toml`, from GitHub:

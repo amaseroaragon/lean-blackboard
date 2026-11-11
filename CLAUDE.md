@@ -192,7 +192,10 @@ Después: sección *Before* (objetivos al principio de la línea) con resaltado 
 de error/aviso con notación matemática y estados fijados. Después (2026-11-09): sección
 *Definition* en modo preciso (firma y ecuaciones de los `def`/`abbrev` del comando en el cursor, a
 partir de las ecuaciones de Lean; campos de `structure` y constructores de `inductive`; en modo rápido, leídos del código fuente), `Bool`
-como `\mathtt{}` y constantes nombradas como las imprime Lean en ese contexto.
+como `\mathtt{}` y constantes nombradas como las imprime Lean en ese contexto. Después
+(2026-11-11): pasos dentro de `simp` en modo preciso (con el cursor en la lista de lemas de
+`simp only [a, b]`, el paquete Lean relanza la táctica con el prefijo de la lista anterior al
+cursor; `lean/LeanBlackboard/SimpSteps.lean`; campo opcional `simpStep?`, sin cambio de versión).
 Protocolo del paquete Lean: versión 5.
 Ver `docs/`.
 
