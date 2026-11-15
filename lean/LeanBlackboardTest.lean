@@ -59,6 +59,34 @@ variable (n m k : Nat) (a b c : Int) (p q r : Prop) (l s : List Nat) (f : Nat �
 /-- info: x_{1} + x' = 0 -/
 #guard_msgs in #latex x₁ + x' = 0
 
+-- A negative operand is parenthesised after an arithmetic operator, not after a relation.
+/-- info: a = -1 -/
+#guard_msgs in #latex a = -1
+/-- info: a \leq -b \land -b < c -/
+#guard_msgs in #latex a ≤ -b ∧ -b < c
+/-- info: a - \left(-b\right) = a + b -/
+#guard_msgs in #latex a - -b = a + b
+/-- info: -\left(-a\right) = a -/
+#guard_msgs in #latex - -a = a
+
+-- Literals and structures Lean prints with their own notation.
+/-- info: u < 2.5 \land 0.05 < u -/
+#guard_msgs in #latex u < 2.5 ∧ 0.05 < u
+/-- info: \left(n, m, k\right).1 = n -/
+#guard_msgs in #latex (n, m, k).1 = n
+/-- info: \forall p : \mathbb{N} \times \mathbb{N},\ p.1 + p.2 = p.2 + p.1 -/
+#guard_msgs in #latex ∀ p : Nat × Nat, p.1 + p.2 = p.2 + p.1
+/-- info: \forall h : n > 0,\ \left\langle n, h\right\rangle  = n -/
+#guard_msgs in #latex ∀ h : n > 0, (⟨n, h⟩ : {x : Nat // x > 0}).val = n
+/-- info: \forall h : n < \operatorname{List.length}\left(l\right),\ l\left[n\right] = 0 -/
+#guard_msgs in #latex ∀ h : n < l.length, l[n] = 0
+/-- info: \begin{cases} n & \text{if } n = m \\ m & \text{otherwise} \end{cases} = k -/
+#guard_msgs in #latex (if _h : n = m then n else m) = k
+
+-- `sorry` (also the one Lean inserts for a term with errors) is not expanded.
+/-- info: n = \mathrm{sorry} -/
+#guard_msgs in #latex n = sorryAx Nat false
+
 -- Lists, functions, conditionals.
 /-- info: l \mathbin{+\!\!+} \left[1, 2\right] = 0 :: l -/
 #guard_msgs in #latex l ++ [1, 2] = 0 :: l

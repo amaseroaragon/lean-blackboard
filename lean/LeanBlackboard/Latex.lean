@@ -220,6 +220,26 @@ partial def listLiteral? (e : Expr) : Option (Array Expr) :=
   | .const ``List.cons _, #[_, h, t] => (listLiteral? t).map (#[h] ++ ·)
   | _, _ => none
 
+/-- A numeric literal: raw (`nat_lit 2`) or through `OfNat.ofNat`. -/
+def natLit? (e : Expr) : Option Nat :=
+  let e := e.consumeMData
+  e.rawNatLit? <|> e.nat?
+
+/-- `(a, b, c)` from `Prod.mk a (Prod.mk b c)`. -/
+partial def tupleItems (e : Expr) : Array Expr :=
+  let e := e.consumeMData
+  if e.isAppOfArity ``Prod.mk 4 then #[e.getArg! 2] ++ tupleItems (e.getArg! 3) else #[e]
+
+/-- A decimal literal `OfScientific.ofScientific mantissa true exponent`: `25`, `1` is `2.5`. -/
+def decimalLiteral (mantissa exponent : Nat) : String :=
+  let digits := toString mantissa
+  if exponent == 0 then digits
+  else if digits.length ≤ exponent then
+    "0." ++ String.ofList (List.replicate (exponent - digits.length) '0') ++ digits
+  else
+    let cs := digits.toList
+    String.ofList (cs.take (cs.length - exponent)) ++ "." ++ String.ofList (cs.drop (cs.length - exponent))
+
 /-- Constants the printer knows without client rules (client `symbols` take precedence). -/
 def builtinSymbols : List (Name × String) :=
   [(``Nat, "\\mathbb{N}"), (``Int, "\\mathbb{Z}"), (`Rat, "\\mathbb{Q}"), (`Real, "\\mathbb{R}"),
@@ -373,13 +393,18 @@ partial def binop (op : String) (p : Nat) (assoc : Ordering) (a b : Expr) : Late
   -- `assoc`: `.lt` left, `.gt` right, `.eq` none.
   let lp := if assoc == .lt then p else p + 1
   let rp := if assoc == .gt then p else p + 1
-  let rhs := if lb.isNeg then s!"\\left({lb.s}\\right)" else lb.paren rp
+  -- A negated right operand of an arithmetic operator is parenthesised (`a - (-b)`); after a
+  -- relation or a connective (`x = -1`) it needs nothing.
+  let rhs := if lb.isNeg && p ≥ 65 then s!"\\left({lb.s}\\right)" else lb.paren rp
   return { s := s!"{la.paren lp} {op} {rhs}", prec := p }
 
 partial def renderApp (e : Expr) : LatexM Tex := do
   let f := e.getAppFn
   let args := e.getAppArgs
   if let .const c _ := f then
+    -- `sorry` (also the one Lean inserts for a term with errors), as Lean prints it: its
+    -- arguments are bookkeeping, not mathematics.
+    if c == ``sorryAx then return atom "\\mathrm{sorry}"
     if let some t ← renderKnown c args then return t
     -- Coercions are invisible: show the coerced value.
     if isCoeDecl (← getEnv) c || knownCasts.contains c then
@@ -483,7 +508,8 @@ partial def renderKnown (c : Name) (args : Array Expr) : LatexM (Option Tex) := 
     return some { s := s!"{base.paren maxPrec}^\{{exp.s}}", prec := 75 }
   | ``Neg.neg, 3 =>
     let a ← render args[2]!
-    return some { s := s!"-{a.paren 75}", prec := 75, isNeg := true }
+    let inner := if a.isNeg then s!"\\left({a.s}\\right)" else a.paren 75
+    return some { s := s!"-{inner}", prec := 75, isNeg := true }
   | ``Inv.inv, 3 =>
     let a ← render args[2]!
     return some { s := s!"{a.paren maxPrec}^\{-1}", prec := argPrec }
@@ -491,10 +517,44 @@ partial def renderKnown (c : Name) (args : Array Expr) : LatexM (Option Tex) := 
   | ``Nat.succ, 1 =>
     let a ← render args[0]!
     return some { s := s!"{a.paren 65} + 1", prec := 65 }
+  | ``OfScientific.ofScientific, 5 =>
+    -- Decimal literals: `2.5` is `ofScientific 25 true 1`; `1e5` is `ofScientific 1 false 5`.
+    match natLit? args[2]!, args[3]!.consumeMData, natLit? args[4]! with
+    | some m, .const ``Bool.true _, some e => return some (atom (decimalLiteral m e))
+    | some m, .const ``Bool.false _, some e => return some { s := s!"{m} \\cdot 10^\{{e}}", prec := 70 }
+    | _, _, _ => return none
+  | ``Prod.mk, 4 =>
+    let parts ← (tupleItems (mkAppN (.const c []) args)).mapM fun i => return (← render i).s
+    return some (atom s!"\\left({", ".intercalate parts.toList}\\right)")
+  | ``Prod.fst, 3 =>
+    let a ← render args[2]!
+    return some (atom s!"{a.paren maxPrec}.1")
+  | ``Prod.snd, 3 =>
+    let a ← render args[2]!
+    return some (atom s!"{a.paren maxPrec}.2")
+  | ``Subtype.mk, 4 =>
+    -- `⟨x, h⟩`; a proof that is not a hypothesis is elided, as Lean prints it (`⋯`).
+    let val ← render args[2]!
+    let proof ← if args[3]!.consumeMData.isFVar then pure (← render args[3]!).s else pure "\\cdots"
+    return some (atom s!"\\left\\langle {val.s}, {proof}\\right\\rangle ")
+  | ``GetElem.getElem, 8 =>
+    -- `xs[i]`: the proof that the index is valid is not shown.
+    let xs ← render args[5]!
+    let i ← render args[6]!
+    return some (atom s!"{xs.paren maxPrec}\\left[{i.s}\\right]")
   | ``ite, 5 =>
     let cond ← render args[1]!
     let t ← render args[3]!
     let f ← render args[4]!
+    return some (atom s!"\\begin\{cases} {t.s} & \\text\{if } {cond.s} \\\\ {f.s} & \\text\{otherwise} \\end\{cases}")
+  | ``dite, 5 =>
+    -- `if h : c then a else b`: the branches are functions of the proof `h`.
+    let cond ← render args[1]!
+    let branch (f : Expr) : LatexM Tex := match f with
+      | .lam n ty b bi => withLocalDecl (binderName n) bi ty fun h => render (b.instantiate1 h)
+      | _ => render f
+    let t ← branch args[3]!
+    let f ← branch args[4]!
     return some (atom s!"\\begin\{cases} {t.s} & \\text\{if } {cond.s} \\\\ {f.s} & \\text\{otherwise} \\end\{cases}")
   | ``Exists, 2 => renderExists "\\exists" args[1]!
   -- Mathlib constants, matched by name (the package does not depend on Mathlib).
