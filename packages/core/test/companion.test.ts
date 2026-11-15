@@ -21,7 +21,7 @@ describe('manifestHasCompanion', () => {
   });
 
   it('is false for projects without it', () => {
-    expect(manifestHasCompanion({ name: 'Dahlquist', packages: [{ name: 'mathlib' }, { name: 'proofwidgets' }] })).toBe(false);
+    expect(manifestHasCompanion({ name: 'MyProject', packages: [{ name: 'mathlib' }, { name: 'proofwidgets' }] })).toBe(false);
     expect(manifestHasCompanion({ name: '«lean-sample»', packages: [] })).toBe(false);
     expect(manifestHasCompanion(null)).toBe(false);
     expect(manifestHasCompanion('nope')).toBe(false);

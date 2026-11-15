@@ -112,7 +112,7 @@ tex: \operatorname{Function.Injective}\left(f\right)
 lean: ∑ i, g ↑i
 tex: \sum_{i} g\left(i\right)
 
-# Polynomials (real output of `Dahlquist/Defect.lean` goals, fast mode).
+# Polynomials (real output of polynomial goals, fast mode).
 lean: Polynomial.eval (0 + ↑↑x * h) (P + Q) = 0
 tex: \left(P + Q\right)\left({0 + x \cdot h}\right) = 0
 

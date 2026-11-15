@@ -71,7 +71,7 @@ describe('breakToFit', () => {
   const lines = (tex: string) =>
     tex.startsWith('\\begin{aligned}') ? tex.split('\n').slice(1, -1).map((l) => l.replace(/ \\\\$/, '')) : [tex];
 
-  // Real goal from a TFG proof (`Defect.lean:60`, after `simp only [...]`), fast mode.
+  // Real goal from a proof about sums over a structure, after `simp only [...]`, fast mode.
   const real = "\\sum_{x} \\operatorname{M.alpha}\\left(x\\right) \\cdot \\left(c \\cdot \\left(x^{q + 1} \\cdot h^{q + 1}\\right)\\right) - h \\cdot \\sum_{x} \\operatorname{M.beta}\\left(x\\right) \\cdot \\left(c \\cdot \\left(q + 1\\right) \\cdot \\left(x^{q} \\cdot h^{q}\\right)\\right) = c \\cdot h^{q + 1} \\cdot \\left(\\sum_{j} \\operatorname{M.alpha}\\left(j\\right) \\cdot j^{q + 1} - \\left(q + 1\\right) \\cdot \\sum_{j} \\operatorname{M.beta}\\left(j\\right) \\cdot j^{q}\\right)";
 
   it('leaves formulas that fit unchanged', () => {
@@ -127,7 +127,7 @@ describe('breakToFit: content that fits alone but not after its function', () =>
     l.replace(/\\(left|right)./g, 'x').replace(/\\quad /g, '  ').replace(/\\[A-Za-z]+/g, 'x').replace(/[{}&\s]/g, '').length;
 
   it('splits `f(long)(a + b)` inside the last group', () => {
-    // Real line from a TFG goal: `(c (q + 1)) X^q` evaluated at `0 + x h`.
+    // Real line from a polynomial goal: `(c (q + 1)) X^q` evaluated at `0 + x h`.
     const line = '\\cdot \\left(\\left(c \\cdot \\left(q + 1\\right)\\right) X^{q}\\right)\\left({0 + x \\cdot h}\\right)';
     // 22 wide: does not fit in 16, although `0 + x h` alone would.
     const tex = breakToFit(line, (l) => visible(l) <= 16);
