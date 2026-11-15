@@ -39,3 +39,6 @@ variable (a x y δ ε : ℝ) (f : ℝ → ℝ) (n k : ℕ) (s t u : Set ℝ) (S 
 #check Set.univ \ s = sᶜ
 #check Function.Injective f
 #check ∑ i : Fin n, g i
+#check 0 < x⁻¹ ^ 2
+#check |(|a| - |y|)| ≤ |a - y|
+#check deriv (f + f) x = deriv f x + deriv f x

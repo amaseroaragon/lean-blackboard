@@ -99,3 +99,17 @@ tex: \texttt{if n = 0 then 1 else 2}
 
 lean: Prop
 tex: \mathrm{Prop}
+
+# A negative operand is parenthesised after an arithmetic operator, not after a relation.
+lean: a = -1
+tex: a = -1
+
+lean: a ≤ -a ∧ - -a = a
+tex: a \leq -a \land -\left(-a\right) = a
+
+lean: a - -a = 2 * a
+tex: a - \left(-a\right) = 2 \cdot a
+
+# Dependent function type: the binder is kept.
+lean: (i : ι) → β i
+tex: \left(i : \iota\right) \to \beta\left(i\right)

@@ -125,8 +125,11 @@ export function tokenize(input: string): Token[] {
     }
 
     const rest = chars.slice(i, i + 3).join('');
-    const op = OPERATORS.find((o) => rest.startsWith(o));
+    let op = OPERATORS.find((o) => rest.startsWith(o));
     if (op === undefined) throw new ParseError(`Unexpected character '${c}'`);
+    // Lean prints the boolean "or" with spaces around it (`a || b`); glued bars are nested
+    // absolute values (`||a| - |b||`).
+    if (op === '||' && !(i > 0 && /\s/u.test(chars[i - 1] ?? '') && /\s/u.test(peek(2)))) op = '|';
     tokens.push({ kind: 'op', text: op });
     i += Array.from(op).length;
   }

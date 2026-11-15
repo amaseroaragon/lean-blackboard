@@ -118,3 +118,13 @@ tex: \left(P + Q\right)\left({0 + x \cdot h}\right) = 0
 
 lean: Polynomial.eval (0 + ↑↑x * h) ((Polynomial.monomial (q + 1)) c)
 tex: \left(c X^{q + 1}\right)\left({0 + x \cdot h}\right)
+
+# A superscript on a superscript, nested absolute values, the derivative of a sum.
+lean: 0 < x⁻¹ ^ 2
+tex: 0 < \left(x^{-1}\right)^{2}
+
+lean: ||a| - |y|| ≤ |a - y|
+tex: \left|\left|a\right| - \left|y\right|\right| \leq \left|a - y\right|
+
+lean: deriv (f + f) x = deriv f x + deriv f x
+tex: \left(f + f\right)'\left({x}\right) = f'\left({x}\right) + f'\left({x}\right)

@@ -122,8 +122,9 @@ export const defaultRules: Rules = {
     'Polynomial.eval': { arity: 2, template: '#2\\left({#1}\\right)' },
     // `Polynomial.monomial n c` is `c X^n`.
     'Polynomial.monomial': { arity: 2, template: '#2 X^{#1}' },
-    // `deriv f x`. The precise mode renders `deriv (fun x => …) x` as d/dx itself.
-    deriv: { arity: 2, template: "{#1}'\\left({#2}\\right)" },
+    // `deriv f x`. `#1` (not `{#1}`) keeps `(f + g)` parenthesised. The precise mode renders
+    // `deriv (fun x => …) x` as d/dx itself.
+    deriv: { arity: 2, template: "#1'\\left({#2}\\right)" },
     // Short names printed under `open Real` (fast mode only sees the text).
     rexp: { arity: 1, template: '\\exp #1' },
     exp: { arity: 1, template: '\\exp #1' },

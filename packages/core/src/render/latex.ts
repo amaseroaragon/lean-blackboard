@@ -1,6 +1,7 @@
 // AST → LaTeX using a rule set.
 
 import type { BinderGroup, Term } from '../parser/ast';
+import { INFIX } from '../parser/syntax';
 import type { Rules } from '../rules/types';
 import { escapeMath, identToLatex } from './ident';
 
@@ -73,16 +74,25 @@ export class LatexRenderer {
         return `${this.render(t.obj)}.${identToLatex(t.name, {})}`;
       case 'binop': {
         // `a ^ 2` where `a` renders without closing delimiter (`\sin x`) needs explicit parens.
-        const lhs = t.op === '^' ? this.protectBase(t.lhs) : t.lhs;
-        // A negated operand on the right reads better parenthesised: `a \cdot (-b)`.
-        const rhs = t.rhs.k === 'prefix' && t.rhs.op === '-' ? `\\left(${this.render(t.rhs)}\\right)` : t.rhs;
-        return this.fill(this.rules.infix[t.op] ?? `#1 \\mathbin{${escapeMath(t.op)}} #2`, [lhs, rhs]);
+        const template = this.rules.infix[t.op] ?? `#1 \\mathbin{${escapeMath(t.op)}} #2`;
+        // `(i : ι) → f i` is a dependent function type: the binder is kept, not read as `(2 : ℝ)`.
+        const pi = t.op === '→' ? this.piBinder(t.lhs) : undefined;
+        const lhs = pi ?? (t.op === '^' ? this.protectBase(t.lhs) : t.lhs);
+        // A negated right operand of an arithmetic operator reads better parenthesised:
+        // `a \cdot (-b)`. Not after a relation or a connective (`x = -1`), nor in a group slot
+        // (`\frac{a}{-b}`).
+        const negated = t.rhs.k === 'prefix' && t.rhs.op === '-';
+        const arithmetic = (INFIX[t.op]?.prec ?? 0) >= 65 && !template.includes('{#2}');
+        const rhs = negated && arithmetic ? `\\left(${this.render(t.rhs)}\\right)` : t.rhs;
+        return this.fill(template, [lhs, rhs]);
       }
       case 'prefix': {
         if ((t.op === '¬' || t.op === '!') && t.arg.k === 'binop') {
           return `\\neg\\left(${this.render(t.arg)}\\right)`;
         }
-        return this.fill(this.rules.prefix[t.op] ?? `${escapeMath(t.op)}#1`, [t.arg]);
+        // `- -a`: two signs in a row need parentheses to be read.
+        const arg = t.op === '-' && t.arg.k === 'prefix' && t.arg.op === '-' ? `\\left(${this.render(t.arg)}\\right)` : t.arg;
+        return this.fill(this.rules.prefix[t.op] ?? `${escapeMath(t.op)}#1`, [arg]);
       }
       case 'postfix':
         return this.fill(this.rules.postfix[t.op] ?? `#1${escapeMath(t.op)}`, [this.protectBase(t.arg)]);
@@ -214,8 +224,14 @@ export class LatexRenderer {
     return identToLatex(name, this.rules.symbols, head);
   }
 
-  /** Parenthesises an operand of `^`/postfix if it is a function rule application (`\\sin x`). */
+  /**
+   * Parenthesises an operand of `^`/postfix if it is a function rule application (`\\sin x`) or
+   * already carries a superscript (`x⁻¹ ^ 2`: `x^{-1}^{2}` is a "double superscript" error).
+   */
   private protectBase(t: Term): Term | string {
+    if (t.k === 'postfix' && (this.rules.postfix[t.op] ?? '').includes('^')) {
+      return `\\left(${this.render(t)}\\right)`;
+    }
     // The rule applied to `t`, if any; self-delimiting templates (`\sqrt{…}`, `\left|…\right|`)
     // need no parentheses.
     const ruleFor = (n: string) => this.rules.functions[n] ?? this.fieldRule(n)?.rule;
@@ -223,6 +239,19 @@ export class LatexRenderer {
       t.k === 'app' && t.fn.k === 'ident' ? ruleFor(t.fn.name) : t.k === 'ident' ? this.fieldRule(t.name)?.rule : undefined;
     if (rule && !closesWithDelimiter(rule.template)) return `\\left(${this.render(t)}\\right)`;
     return t;
+  }
+
+  /** `(i : ι)` or `(a b : α)` on the left of an arrow, as `\left(i : \iota\right)`. */
+  private piBinder(t: Term): string | undefined {
+    if (t.k !== 'paren' || t.inner.k !== 'ascription') return undefined;
+    const { term, type } = t.inner;
+    const vars = term.k === 'app' ? [term.fn, ...term.args] : [term];
+    const names: string[] = [];
+    for (const v of vars) {
+      if (v.k !== 'ident') return undefined;
+      names.push(identToLatex(v.name, this.rules.symbols));
+    }
+    return `\\left(${names.join(', ')} : ${this.render(type)}\\right)`;
   }
 
   private argList(args: Term[]): string {

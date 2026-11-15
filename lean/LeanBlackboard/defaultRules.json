@@ -131,7 +131,7 @@
     {
       "name": "deriv",
       "arity": 2,
-      "template": "{#1}'\\left({#2}\\right)"
+      "template": "#1'\\left({#2}\\right)"
     },
     {
       "name": "exp",
