@@ -1,4 +1,5 @@
 import Lean
+import LeanBlackboard.Compat
 
 /-!
 # Steps inside a `simp` lemma list
@@ -139,7 +140,7 @@ def simpStepGoals (position : Lsp.Position) : RequestM (RequestTask (Option Simp
   let doc ← RequestM.readDoc
   let pos := doc.meta.text.lspPosToUtf8Pos position
   let cancelTk := (← read).cancelTk.cancelledByCancelRequest
-  RequestM.mapTaskCostly (RequestM.findInfoTreeAtPos doc pos (includeStop := true)) fun tree? => do
+  RequestM.mapTaskCostly (infoTreeAtPos doc pos (includeStop := true)) fun tree? => do
     let some tree := tree? | return none
     -- One node per run of the tactic (`t <;> simp [a, b]` runs it on every goal). The goals at
     -- the cursor are not enough to find them: `simpa … using e` hides its node behind a nested one.

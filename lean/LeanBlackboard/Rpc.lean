@@ -1,4 +1,5 @@
 import Lean
+import LeanBlackboard.Compat
 import LeanBlackboard.Latex
 import LeanBlackboard.Command
 import LeanBlackboard.Definition
@@ -202,7 +203,7 @@ private def definitionsAt (p : GoalsLatexParams) :
     RequestM (ServerTask (Array (Elab.ContextInfo × Name))) := do
   let doc ← RequestM.readDoc
   let pos := doc.meta.text.lspPosToUtf8Pos p.position
-  return RequestM.findCmdParsedSnap doc pos |>.bindCheap fun
+  return cmdParsedSnapAt doc pos |>.bindCheap fun
     | some cmd =>
       if isDefinitionCommand cmd.stx then
         cmd.elabSnap.infoTreeSnap.task.asServerTask.mapCheap fun s =>
