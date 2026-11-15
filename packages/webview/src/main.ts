@@ -270,6 +270,7 @@ function renderState(state: PanelState): Node[] {
       if (state.fallbackReason) {
         nodes.push(message(`Showing plain goals (interactive goals failed: ${state.fallbackReason})`, 'message warning'));
       }
+      if (state.preciseProblem) nodes.push(message(state.preciseProblem, 'message warning'));
       if (state.simpStep) nodes.push(renderSimpStep(state.simpStep));
       const before = renderBefore(state);
       if (before) nodes.push(before);
@@ -489,27 +490,29 @@ function subexprOf(node: HTMLElement): SubexprView | undefined {
 }
 
 function setHovered(node: HTMLElement | undefined, x: number, y: number): void {
+  // The tooltip's content only changes with the hovered subterm; moving inside it just moves it.
   if (node !== hovered) {
     hovered?.classList.remove('lb-hover');
     hovered = node;
     hovered?.classList.add('lb-hover');
+    const data = node ? subexprOf(node) : undefined;
+    if (!data) {
+      tooltip.classList.add('hidden');
+      return;
+    }
+    const formula = el('div', 'lb-tooltip-math');
+    const parts: Node[] = [formula];
+    if (data.const) {
+      const hint = data.location ? ` — ${isMac ? '⌘' : 'Ctrl'}+click to go to definition` : '';
+      parts.push(el('div', 'lb-tooltip-hint', `${data.const}${hint}`));
+    }
+    tooltip.replaceChildren(...parts);
+    tooltip.classList.remove('hidden');
+    // Rendered once visible, so that long types can be broken to the tooltip's width.
+    renderMath(formula, `${data.latex} : ${data.typeLatex}`, `${data.expr} : ${data.type}`);
+    fitNode(formula);
   }
-  const data = node ? subexprOf(node) : undefined;
-  if (!node || !data) {
-    tooltip.classList.add('hidden');
-    return;
-  }
-  const formula = el('div', 'lb-tooltip-math');
-  const parts: Node[] = [formula];
-  if (data.const) {
-    const hint = data.location ? ` — ${isMac ? '⌘' : 'Ctrl'}+click to go to definition` : '';
-    parts.push(el('div', 'lb-tooltip-hint', `${data.const}${hint}`));
-  }
-  tooltip.replaceChildren(...parts);
-  tooltip.classList.remove('hidden');
-  // Rendered once visible, so that long types can be broken to the tooltip's width.
-  renderMath(formula, `${data.latex} : ${data.typeLatex}`, `${data.expr} : ${data.type}`);
-  fitNode(formula);
+  if (!node || tooltip.classList.contains('hidden')) return;
   // Below the pointer, kept inside the panel.
   const left = Math.max(4, Math.min(x + 8, window.innerWidth - tooltip.offsetWidth - 4));
   const top = y + 16 + tooltip.offsetHeight > window.innerHeight ? y - tooltip.offsetHeight - 8 : y + 16;

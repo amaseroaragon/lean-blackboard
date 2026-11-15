@@ -13,10 +13,13 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
   private ready = false;
   private state: PanelState = { kind: 'waiting' };
   private readonly visibilityEmitter = new vscode.EventEmitter<boolean>();
+  private readonly revealEmitter = new vscode.EventEmitter<number>();
   private readonly disposables: vscode.Disposable[] = [];
 
   /** Fires when the panel becomes visible or hidden. */
   readonly onDidChangeVisibility = this.visibilityEmitter.event;
+  /** Fires with a 0-based line when a message is clicked: the Lean editor should show it. */
+  readonly onDidRequestReveal = this.revealEmitter.event;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -67,16 +70,10 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
           void vscode.window.showTextDocument(uri, { selection: new vscode.Range(pos, pos), preview: true });
           break;
         }
-        case 'reveal': {
-          // Click on a message: show its line in the Lean editor.
-          const editor = vscode.window.visibleTextEditors.find((e) => e.document.languageId === 'lean4');
-          if (!editor) break;
-          const pos = new vscode.Position(m.line, 0);
-          editor.selection = new vscode.Selection(pos, pos);
-          editor.revealRange(new vscode.Range(pos, pos));
-          void vscode.window.showTextDocument(editor.document, editor.viewColumn);
+        case 'reveal':
+          // Click on a message: whoever follows the Lean editor knows which one it is.
+          if (Number.isInteger(m.line) && m.line >= 0) this.revealEmitter.fire(m.line);
           break;
-        }
         case 'copy':
           void vscode.env.clipboard.writeText(m.text).then(() => {
             vscode.window.setStatusBarMessage('Lean Blackboard: LaTeX copied', 2000);
@@ -141,6 +138,7 @@ export class GoalsPanel implements vscode.WebviewViewProvider, vscode.Disposable
 
   dispose(): void {
     this.visibilityEmitter.dispose();
+    this.revealEmitter.dispose();
     for (const d of this.disposables) d.dispose();
   }
 }

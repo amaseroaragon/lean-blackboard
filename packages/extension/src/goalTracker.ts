@@ -38,6 +38,8 @@ export class GoalTracker implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   /** Files where the companion package is not available → time of the last check. */
   private readonly noPrecise = new Map<string, number>();
+  /** Files whose companion package answered with another protocol version → what to tell the user. */
+  private readonly preciseProblems = new Map<string, string>();
   /** Lake project folder → whether its manifest has the companion package (by manifest mtime). */
   private readonly companion = new Map<string, { mtimeMs: number; has: boolean }>();
 
@@ -70,6 +72,7 @@ export class GoalTracker implements vscode.Disposable {
         if (e.document === this.leanEditor?.document) this.schedule();
       }),
       vscode.workspace.onDidCloseTextDocument((doc) => {
+        this.preciseProblems.delete(doc.uri.toString());
         if (doc === this.leanEditor?.document) {
           this.leanEditor = undefined;
           this.schedule();
@@ -91,6 +94,7 @@ export class GoalTracker implements vscode.Disposable {
       this.panel.onDidChangeVisibility((visible) => {
         if (visible) this.schedule();
       }),
+      this.panel.onDidRequestReveal((line) => this.reveal(line)),
     );
   }
 
@@ -128,6 +132,8 @@ export class GoalTracker implements vscode.Disposable {
     const t0 = performance.now();
     // Messages on this line, in parallel with the goals (never fails the update).
     const messagesP = this.messages(doc.uri, pos.line, token);
+    // It rejects when cancelled, and the paths below that return early never await it.
+    messagesP.catch(() => undefined);
     try {
       const precise = await this.tryPrecise(doc.uri, position, token);
       if (token.isCancellationRequested) return;
@@ -185,6 +191,7 @@ export class GoalTracker implements vscode.Disposable {
         goalsBefore: interactiveGoalsToView(beforeRes, this.settings.rules) ?? undefined,
         definitions,
         messages,
+        preciseProblem: this.settings.mode === 'fast' ? undefined : this.preciseProblems.get(doc.uri.toString()),
         mode: 'fast',
       });
       return;
@@ -277,14 +284,22 @@ export class GoalTracker implements vscode.Disposable {
     try {
       const rules = this.settings.rules;
       const res = await this.bridge.preciseGoals(uri, position, PRECISE_METHOD, rulesToWire(rules), token, true);
+      const view = preciseGoalsToView(res, rules);
       this.noPrecise.delete(key);
-      return preciseGoalsToView(res, rules);
+      this.preciseProblems.delete(key);
+      return view;
     } catch (e) {
       if (e instanceof CancelledError) throw e;
+      this.preciseProblems.delete(key);
       if (errorCode(e) === ERR_METHOD_NOT_FOUND) {
         if (checked === undefined) this.log.info(`Precise mode not available for ${vscode.workspace.asRelativePath(uri)} (companion package not imported); using fast mode.`);
       } else if (e instanceof PreciseProtocolError) {
         this.log.warn(`Precise mode disabled for this file: ${e.message}`);
+        // Shown in the panel: otherwise precise mode just disappears without an explanation.
+        this.preciseProblems.set(
+          key,
+          `Precise mode is off: ${e.message} Update the LeanBlackboard package (lake update LeanBlackboard) or this extension so that they match.`,
+        );
       } else {
         this.log.warn(`Precise mode failed (${describeError(e)}); using fast mode.`);
       }
@@ -324,6 +339,17 @@ export class GoalTracker implements vscode.Disposable {
       this.log.info(`Precise mode not available in ${folder} (no LeanBlackboard package in lake-manifest.json); using fast mode.`);
     }
     return has;
+  }
+
+  /** Click on a message in the panel: show its line in the Lean editor the panel follows. */
+  private reveal(line: number): void {
+    const editor = this.leanEditor ?? vscode.window.visibleTextEditors.find((e) => isLean(e.document));
+    if (!editor) return;
+    const pos = new vscode.Position(line, 0);
+    void vscode.window.showTextDocument(editor.document, {
+      viewColumn: editor.viewColumn,
+      selection: new vscode.Range(pos, pos),
+    });
   }
 
   private startRequest(): vscode.CancellationTokenSource {

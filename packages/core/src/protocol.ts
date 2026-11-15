@@ -98,6 +98,11 @@ export type PanelState =
       subexprs?: SubexprView[];
       /** Set when the RPC path failed and `plainGoal` was used instead. */
       fallbackReason?: string;
+      /**
+       * Set when the companion package is imported but cannot be used (protocol version
+       * mismatch), so fast mode is shown instead: what is wrong and how to fix it.
+       */
+      preciseProblem?: string;
       /** `precise`: LaTeX from the companion Lean package; `fast`: converted from text here. */
       mode: ConversionMode;
     }

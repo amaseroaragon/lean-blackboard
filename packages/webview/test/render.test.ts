@@ -104,6 +104,30 @@ describe('webview rendering', () => {
     expect(root().querySelector('section.pin')?.textContent).toContain('Simp.lean:4:40');
   });
 
+  it('says why precise mode is off when the companion package does not match', () => {
+    const problem = 'Precise mode is off: Companion package protocol version 4, expected 5.';
+    show({ ...base, goals: [after], preciseProblem: problem });
+    expect(root().querySelector('.message.warning')?.textContent).toBe(problem);
+    show({ ...base, goals: [after] });
+    expect(root().querySelector('.message.warning')).toBeNull();
+  });
+
+  it('the hover tooltip is drawn once per subterm, not on every mouse move', () => {
+    const subexprs = [{ latex: 'a', expr: 'a', typeLatex: '\\mathbb{N}', type: 'ℕ' }];
+    show({ ...base, mode: 'precise', goals: [goal('\\htmlData{lbid=0}{a} = b', 'a = b')], subexprs });
+    const target = root().querySelector<HTMLElement>('[data-lbid]');
+    expect(target).not.toBeNull();
+    const move = () => target?.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 5, clientY: 5 }));
+    move();
+    const tooltip = document.querySelector<HTMLElement>('.lb-tooltip');
+    expect(tooltip?.classList.contains('hidden')).toBe(false);
+    const drawn = tooltip?.firstElementChild;
+    move();
+    expect(tooltip?.firstElementChild).toBe(drawn);
+    root().dispatchEvent(new MouseEvent('mouseleave'));
+    expect(tooltip?.classList.contains('hidden')).toBe(true);
+  });
+
   it('a state that cannot be drawn shows an error instead of the previous state', () => {
     show({ ...base, goals: [after] });
     // Malformed on purpose: a goal entry that is not an object.
