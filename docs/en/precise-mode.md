@@ -122,9 +122,13 @@ it as the InfoView does. Fast mode cannot run tactics, so it always shows the st
    in files that import it (directly or indirectly).
 4. Restart the file in VS Code (`Lean 4: Restart File`) if it was already open.
 
-The package is tested with `leanprover/lean4:v4.34.1` (and Mathlib `v4.34.1`). Lake builds it with
-your project's toolchain, so it may not compile with other Lean versions; fast mode remains
-available in that case.
+The package is tested with `leanprover/lean4:v4.34.1` (and Mathlib `v4.34.1`); it also compiles,
+and its printer tests pass, with `v4.35.0`. Lake builds it with your project's toolchain, so it may
+not compile with other Lean versions; fast mode remains available in that case.
+
+The package and the extension must speak the same protocol version. If one of them is older, the
+panel stays in fast mode and says so above the goals: update the package
+(`lake update LeanBlackboard`) or the extension.
 
 The panel shows a `precise` or `fast` label next to the position. If the package is not imported,
 the extension falls back to fast mode on its own and tries again when the file is saved or after

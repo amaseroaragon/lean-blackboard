@@ -123,9 +123,13 @@ estados alrededor de la línea.
    existe en ficheros que lo importan (directa o indirectamente).
 4. Reinicia el fichero en VS Code (`Lean 4: Restart File`) si ya estaba abierto.
 
-El paquete está probado con `leanprover/lean4:v4.34.1` (y Mathlib `v4.34.1`). Lake lo compila con
-el toolchain de tu proyecto, así que con otras versiones de Lean puede no compilar; en ese caso
-queda el modo rápido.
+El paquete está probado con `leanprover/lean4:v4.34.1` (y Mathlib `v4.34.1`); también compila, y
+pasan los tests de su printer, con `v4.35.0`. Lake lo compila con el toolchain de tu proyecto, así
+que con otras versiones de Lean puede no compilar; en ese caso queda el modo rápido.
+
+El paquete y la extensión tienen que hablar la misma versión del protocolo. Si uno de los dos es
+más antiguo, el panel se queda en modo rápido y lo dice encima de los objetivos: actualiza el
+paquete (`lake update LeanBlackboard`) o la extensión.
 
 El panel muestra una etiqueta `precise` o `fast` junto a la posición. Si el paquete no está
 importado, la extensión vuelve al modo rápido sola y lo vuelve a intentar al guardar el fichero o
