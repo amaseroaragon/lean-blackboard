@@ -193,7 +193,7 @@
     "build": "node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "package": "vsce package --no-dependencies --skip-license -o ../../lean-blackboard.vsix",
+    "package": "node licenses.mjs && vsce package --no-dependencies -o ../../lean-blackboard.vsix",
     "build:test": "node esbuild.integration.mjs",
     "test:integration": "node esbuild.integration.mjs && node dist-test/runTest.js"
   },

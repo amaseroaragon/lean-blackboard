@@ -1,9 +1,11 @@
-# Only the bundles, the icon and the manifest go into the .vsix (no source maps).
+# Only the bundles, the icon, the manifest and the licenses go into the .vsix (no source maps).
 **
 !dist/extension.js
 !dist/webview/webview.js
 !dist/webview/webview.css
-!dist/webview/fonts/**
+!dist/webview/fonts/*.woff2
 !media/**
 !package.json
 !README.md
+!LICENSE
+!ThirdPartyNotices.txt

@@ -13,7 +13,10 @@ const options = {
   target: 'es2022',
   sourcemap: true,
   minify: !watch,
-  loader: { '.woff2': 'file', '.woff': 'file', '.ttf': 'file' },
+  // Webviews are Chromium: only WOFF2 is ever loaded. The other formats KaTeX's CSS lists are
+  // left as (unused) URLs instead of being copied.
+  loader: { '.woff2': 'file' },
+  external: ['*.woff', '*.ttf'],
   assetNames: 'fonts/[name]',
   logLevel: 'info',
 };

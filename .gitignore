@@ -4,3 +4,6 @@ dist/
 *.vsix
 .vscode-test/
 dist-test/
+# Written by `npm run package` (see packages/extension/licenses.mjs).
+packages/extension/LICENSE
+packages/extension/ThirdPartyNotices.txt
